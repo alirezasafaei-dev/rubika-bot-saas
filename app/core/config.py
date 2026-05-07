@@ -50,5 +50,22 @@ class Settings(BaseSettings):
     argon2_hash_len: int = 32
     argon2_salt_len: int = 16
 
+    # --- Aliases برای backward compatibility با main.py قدیمی ---
+    @property
+    def PROJECT_NAME(self) -> str:
+        return self.app_name
+
+    @property
+    def VERSION(self) -> str:
+        return self.app_version
+
+    @property
+    def API_V1_STR(self) -> str:
+        return self.api_v1_prefix
+
+    @property
+    def DEBUG(self) -> bool:
+        return self.debug
+
 
 settings = Settings()

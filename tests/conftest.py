@@ -1,64 +1,80 @@
-# tests/conftest.py
-from collections.abc import AsyncGenerator
+"""
+Pytest fixtures for the whole test suite.
 
+Only imports models that have been implemented so far (Phase 3).
+"""
+from __future__ import annotations
+
+import asyncio
+from typing import AsyncGenerator, Generator
+
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import (
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
+from sqlalchemy import NullPool, create_engine, event
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.core.config import settings
 from app.db.base import Base
-from app.db.session import get_db
+
+# ── Import only currently-existing models ───────────────────────────
+# Phase 3 models – add more as later phases are implemented.
+from app.models.user import User  # noqa: F401
+from app.models.workspace import Workspace  # noqa: F401
+from app.models.workspace import WorkspaceMember  # noqa: F401
+# ────────────────────────────────────────────────────────────────────
+
 from app.main import app
 
-# Import models so SQLAlchemy metadata includes all tables before create_all.
-from app.models.auto_reply import AutoReply  # noqa: F401
-from app.models.channel import Channel  # noqa: F401
-from app.models.filter import Filter  # noqa: F401
-from app.models.refresh_token import RefreshToken  # noqa: F401
-from app.models.report import Report  # noqa: F401
-from app.models.scheduled_post import ScheduledPost  # noqa: F401
-from app.models.user import User  # noqa: F401
-from app.models.webhook import Webhook, WebhookDelivery  # noqa: F401
-from app.models.workspace import Workspace, WorkspaceMember  # noqa: F401
+# Use a separate test database
+TEST_DATABASE_URL = settings.database_url + "_test"
 
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
-
-engine = create_async_engine(TEST_DATABASE_URL, future=True)
-TestingSessionLocal = async_sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
+engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)
+TestSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
-@pytest_asyncio.fixture(scope="function", autouse=True)
-async def prepare_database() -> AsyncGenerator[None, None]:
+@pytest.fixture(scope="session")
+def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
+    """Create a single event loop for the whole session."""
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def setup_database() -> AsyncGenerator[None, None]:
+    """Create all tables before each test and drop them after."""
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
 
-@pytest_asyncio.fixture(scope="function")
-async def db() -> AsyncGenerator[AsyncSession, None]:
-    async with TestingSessionLocal() as session:
+@pytest_asyncio.fixture
+async def db_session() -> AsyncGenerator[AsyncSession, None]:
+    """Provide a clean DB session per test."""
+    async with TestSessionLocal() as session:
+        yield session
+        await session.rollback()
+
+
+@pytest_asyncio.fixture
+async def client() -> AsyncGenerator[AsyncClient, None]:
+    """Provide an async HTTP client for the FastAPI app."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
+
+# ── Helper to override DB dependency ────────────────────────────────
+from app.db import get_db  # noqa: E402
+
+
+async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+    """Override the main ``get_db`` dependency with the test DB."""
+    async with TestSessionLocal() as session:
         yield session
 
 
-@pytest_asyncio.fixture(scope="function")
-async def client(db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
-    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://testserver",
-    ) as async_client:
-        yield async_client
-    app.dependency_overrides.clear()
+app.dependency_overrides[get_db] = override_get_db

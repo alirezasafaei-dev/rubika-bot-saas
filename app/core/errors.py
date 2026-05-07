@@ -1,103 +1,75 @@
 # app/core/errors.py
-from enum import StrEnum
-from typing import Any
-
-from fastapi import Request, status
-from fastapi.responses import JSONResponse
+from enum import Enum
 
 
-class ErrorCode(StrEnum):
-    INVALID_CREDENTIALS = "INVALID_CREDENTIALS"
-    EMAIL_ALREADY_EXISTS = "EMAIL_ALREADY_EXISTS"
-    INVALID_TOKEN = "INVALID_TOKEN"
-    INVALID_REFRESH_TOKEN = "INVALID_REFRESH_TOKEN"
-    REFRESH_TOKEN_EXPIRED = "REFRESH_TOKEN_EXPIRED"
-    REFRESH_TOKEN_REVOKED = "REFRESH_TOKEN_REVOKED"
-    USER_NOT_FOUND = "USER_NOT_FOUND"
-    UNAUTHORIZED = "UNAUTHORIZED"
-    FORBIDDEN = "FORBIDDEN"
-
-    WORKSPACE_NOT_FOUND = "WORKSPACE_NOT_FOUND"
-    WORKSPACE_ACCESS_DENIED = "WORKSPACE_ACCESS_DENIED"
-
-    CHANNEL_NOT_FOUND = "CHANNEL_NOT_FOUND"
-    CHANNEL_ACCESS_DENIED = "CHANNEL_ACCESS_DENIED"
-
-    VALIDATION_ERROR = "VALIDATION_ERROR"
-    INVALID_INPUT = "INVALID_INPUT"
-
+class ErrorCode(str, Enum):
+    # General
     INTERNAL_ERROR = "INTERNAL_ERROR"
-    DATABASE_ERROR = "DATABASE_ERROR"
+    VALIDATION_ERROR = "VALIDATION_ERROR"
+    NOT_FOUND = "NOT_FOUND"
+    CONFLICT = "CONFLICT"
+    FORBIDDEN = "FORBIDDEN"
+    UNAUTHORIZED = "UNAUTHORIZED"
 
+    # Auth
+    INVALID_CREDENTIALS = "INVALID_CREDENTIALS"
+    TOKEN_EXPIRED = "TOKEN_EXPIRED"
+    INVALID_TOKEN = "INVALID_TOKEN"
+    USER_ALREADY_EXISTS = "USER_ALREADY_EXISTS"
+    USER_NOT_FOUND = "USER_NOT_FOUND"
 
-ERROR_MESSAGES: dict[ErrorCode, str] = {
-    ErrorCode.INVALID_CREDENTIALS: "Invalid email or password",
-    ErrorCode.EMAIL_ALREADY_EXISTS: "Email already registered",
-    ErrorCode.INVALID_TOKEN: "Invalid or expired token",
-    ErrorCode.INVALID_REFRESH_TOKEN: "Invalid refresh token",
-    ErrorCode.REFRESH_TOKEN_EXPIRED: "Refresh token expired",
-    ErrorCode.REFRESH_TOKEN_REVOKED: "Refresh token has been revoked",
-    ErrorCode.USER_NOT_FOUND: "User not found",
-    ErrorCode.UNAUTHORIZED: "Authentication required",
-    ErrorCode.FORBIDDEN: "Access forbidden",
-    ErrorCode.WORKSPACE_NOT_FOUND: "Workspace not found",
-    ErrorCode.WORKSPACE_ACCESS_DENIED: "Access to workspace denied",
-    ErrorCode.CHANNEL_NOT_FOUND: "Channel not found",
-    ErrorCode.CHANNEL_ACCESS_DENIED: "Access to channel denied",
-    ErrorCode.VALIDATION_ERROR: "Validation error",
-    ErrorCode.INVALID_INPUT: "Invalid input data",
-    ErrorCode.INTERNAL_ERROR: "Internal server error",
-    ErrorCode.DATABASE_ERROR: "Database operation failed",
-}
+    # Workspace
+    WORKSPACE_NOT_FOUND = "WORKSPACE_NOT_FOUND"
+    WORKSPACE_ALREADY_EXISTS = "WORKSPACE_ALREADY_EXISTS"
 
-ERROR_STATUS_CODES: dict[ErrorCode, int] = {
-    ErrorCode.INVALID_CREDENTIALS: status.HTTP_401_UNAUTHORIZED,
-    ErrorCode.EMAIL_ALREADY_EXISTS: status.HTTP_409_CONFLICT,
-    ErrorCode.INVALID_TOKEN: status.HTTP_401_UNAUTHORIZED,
-    ErrorCode.INVALID_REFRESH_TOKEN: status.HTTP_401_UNAUTHORIZED,
-    ErrorCode.REFRESH_TOKEN_EXPIRED: status.HTTP_401_UNAUTHORIZED,
-    ErrorCode.REFRESH_TOKEN_REVOKED: status.HTTP_401_UNAUTHORIZED,
-    ErrorCode.USER_NOT_FOUND: status.HTTP_404_NOT_FOUND,
-    ErrorCode.UNAUTHORIZED: status.HTTP_401_UNAUTHORIZED,
-    ErrorCode.FORBIDDEN: status.HTTP_403_FORBIDDEN,
-    ErrorCode.WORKSPACE_NOT_FOUND: status.HTTP_404_NOT_FOUND,
-    ErrorCode.WORKSPACE_ACCESS_DENIED: status.HTTP_403_FORBIDDEN,
-    ErrorCode.CHANNEL_NOT_FOUND: status.HTTP_404_NOT_FOUND,
-    ErrorCode.CHANNEL_ACCESS_DENIED: status.HTTP_403_FORBIDDEN,
-    ErrorCode.VALIDATION_ERROR: status.HTTP_422_UNPROCESSABLE_ENTITY,
-    ErrorCode.INVALID_INPUT: status.HTTP_422_UNPROCESSABLE_ENTITY,
-    ErrorCode.INTERNAL_ERROR: status.HTTP_500_INTERNAL_SERVER_ERROR,
-    ErrorCode.DATABASE_ERROR: status.HTTP_500_INTERNAL_SERVER_ERROR,
-}
+    # Workspace Member
+    NOT_WORKSPACE_MEMBER = "NOT_WORKSPACE_MEMBER"
+    NOT_WORKSPACE_ADMIN = "NOT_WORKSPACE_ADMIN"
+
+    # Channel
+    CHANNEL_NOT_FOUND = "CHANNEL_NOT_FOUND"
+    CHANNEL_ALREADY_EXISTS = "CHANNEL_ALREADY_EXISTS"
+
+    # Scheduled Post
+    SCHEDULED_POST_NOT_FOUND = "SCHEDULED_POST_NOT_FOUND"
+    SCHEDULED_POST_INVALID_TIME = "SCHEDULED_POST_INVALID_TIME"
+
+    # Auto Reply
+    AUTO_REPLY_NOT_FOUND = "AUTO_REPLY_NOT_FOUND"
+    AUTO_REPLY_ALREADY_EXISTS = "AUTO_REPLY_ALREADY_EXISTS"
+
+    # Filter
+    FILTER_NOT_FOUND = "FILTER_NOT_FOUND"
+    FILTER_ALREADY_EXISTS = "FILTER_ALREADY_EXISTS"
+
+    # Webhook
+    WEBHOOK_NOT_FOUND = "WEBHOOK_NOT_FOUND"
+    WEBHOOK_ALREADY_EXISTS = "WEBHOOK_ALREADY_EXISTS"
 
 
 class AppException(Exception):
-    def __init__(
-        self,
-        error_code: ErrorCode,
-        detail: str | None = None,
-        meta: dict[str, Any] | None = None,
-    ) -> None:
+    def __init__(self, error_code: ErrorCode, message: str | None = None, status_code: int = 400):
         self.error_code = error_code
-        self.detail = detail or ERROR_MESSAGES[error_code]
-        self.meta = meta or {}
-        super().__init__(self.detail)
+        self.message = message or error_code.value.replace("_", " ").title()
+        self.status_code = status_code
+        super().__init__(self.message)
 
 
-async def app_exception_handler(
-    request: Request,
-    exc: AppException,
-) -> JSONResponse:
-    return JSONResponse(
-        status_code=ERROR_STATUS_CODES.get(
-            exc.error_code,
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-        ),
-        content={
-            "error": {
-                "code": exc.error_code,
-                "message": exc.detail,
-                "meta": exc.meta,
-            }
-        },
-    )
+class NotFoundError(AppException):
+    def __init__(self, error_code: ErrorCode, message: str | None = None):
+        super().__init__(error_code, message, status_code=404)
+
+
+class ConflictError(AppException):
+    def __init__(self, error_code: ErrorCode, message: str | None = None):
+        super().__init__(error_code, message, status_code=409)
+
+
+class PermissionDeniedError(AppException):
+    def __init__(self, error_code: ErrorCode, message: str | None = None):
+        super().__init__(error_code, message, status_code=403)
+
+
+class UnauthorizedError(AppException):
+    def __init__(self, error_code: ErrorCode, message: str | None = None):
+        super().__init__(error_code, message, status_code=401)
