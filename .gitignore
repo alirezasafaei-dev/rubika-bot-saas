@@ -1,10 +1,28 @@
-# Python-generated files
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
+*.py[cod]
+*$py.class
 
-# Virtual environments
-.venv
+# Environments
+.venv/
+env/
+venv/
+ENV/
+
+# Sensitive files (Credentials)
+.env
+!.env.example
+
+# Caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.python-version
+
+# Databases (if any)
+*.sqlite3
+*.db
+
+# OS files
+.DS_Store
+Thumbs.db
