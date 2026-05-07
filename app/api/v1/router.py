@@ -1,10 +1,7 @@
 # app/api/v1/router.py
 from fastapi import APIRouter
 
+from app.api.v1.endpoints.auth import router as auth_router
+
 router = APIRouter()
-
-
-@router.get("/health", tags=["health"])
-async def health_check() -> dict[str, str]:
-    """Health check endpoint."""
-    return {"status": "ok"}
+router.include_router(auth_router)

@@ -1,48 +1,50 @@
 # app/models/webhook.py
-from __future__ import annotations
-
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, SoftDeleteMixin, TimestampMixin
+from app.db.base import Base
 
 
-class Webhook(Base, TimestampMixin, SoftDeleteMixin):
+class Webhook(Base):
     __tablename__ = "webhooks"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    workspace_id: Mapped[int] = mapped_column(
-        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    url: Mapped[str] = mapped_column(Text)
+    secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    event_types: Mapped[list[str]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
     )
-    url: Mapped[str] = mapped_column(String(2048), nullable=False)
-    secret: Mapped[str] = mapped_column(String(255), nullable=False)
-    events: Mapped[str] = mapped_column(Text, nullable=False)  # JSON array stored as text
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
-
-    # Relationships
-    deliveries: Mapped[list["WebhookDelivery"]] = relationship(
-        back_populates="webhook", cascade="all, delete-orphan"
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )
 
 
-class WebhookDelivery(Base, TimestampMixin):
+class WebhookDelivery(Base):
     __tablename__ = "webhook_deliveries"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    webhook_id: Mapped[int] = mapped_column(ForeignKey("webhooks.id", ondelete="CASCADE"), nullable=False, index=True)
-    event_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
-    payload: Mapped[str] = mapped_column(Text, nullable=False)  # JSON stored as text
-    status: Mapped[str] = mapped_column(
-        Enum("pending", "success", "failed", name="delivery_status_enum"),
-        nullable=False,
-        server_default="pending",
-        index=True,
-    )
-    http_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    webhook_id: Mapped[int] = mapped_column(ForeignKey("webhooks.id"), index=True)
+    event_type: Mapped[str] = mapped_column(String(100), index=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+    status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
     response_body: Mapped[str | None] = mapped_column(Text, nullable=True)
-    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-
-    # Relationships
-    webhook: Mapped["Webhook"] = relationship(back_populates="deliveries")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )

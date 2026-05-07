@@ -1,26 +1,66 @@
 # app/core/logging.py
 import logging
-import sys
+import logging.config
+import os
+from typing import Any
 
-from app.core.config import settings
 
+def configure_logging() -> None:
+    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
 
-def setup_logging() -> None:
-    """Configure structured logging for the application."""
-    log_level = logging.DEBUG if settings.debug else logging.INFO
+    logging_config: dict[str, Any] = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "default": {
+                "format": "%(asctime)s %(levelname)s [%(name)s] %(message)s",
+            },
+            "access": {
+                "format": '%(asctime)s %(levelname)s [%(name)s] %(client_addr)s - "%(request_line)s" %(status_code)s',
+            },
+        },
+        "handlers": {
+            "default": {
+                "class": "logging.StreamHandler",
+                "formatter": "default",
+                "stream": "ext://sys.stderr",
+            },
+            "access": {
+                "class": "logging.StreamHandler",
+                "formatter": "access",
+                "stream": "ext://sys.stdout",
+            },
+        },
+        "loggers": {
+            "": {
+                "handlers": ["default"],
+                "level": log_level,
+            },
+            "uvicorn": {
+                "handlers": ["default"],
+                "level": log_level,
+                "propagate": False,
+            },
+            "uvicorn.error": {
+                "handlers": ["default"],
+                "level": log_level,
+                "propagate": False,
+            },
+            "uvicorn.access": {
+                "handlers": ["access"],
+                "level": log_level,
+                "propagate": False,
+            },
+            "sqlalchemy.engine": {
+                "handlers": ["default"],
+                "level": os.getenv("SQLALCHEMY_LOG_LEVEL", "WARNING").upper(),
+                "propagate": False,
+            },
+        },
+    }
 
-    logging.basicConfig(
-        level=log_level,
-        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        stream=sys.stdout,
-    )
-
-    # Silence noisy libraries
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.config.dictConfig(logging_config)
 
 
 def get_logger(name: str) -> logging.Logger:
-    """Get a logger instance for the given module name."""
     return logging.getLogger(name)

@@ -27,32 +27,28 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # App
     app_name: str = "Rubika Bot SaaS"
     app_version: str = "0.1.0"
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
 
-    # Database
     database_url: Annotated[PostgresDsn, BeforeValidator(parse_postgres_dsn)] = Field(
         default=PostgresDsn("postgresql+psycopg://user:pass@localhost:5432/rubika_bot")
     )
-
-    # Redis
     redis_url: Annotated[RedisDsn, BeforeValidator(parse_redis_dsn)] = Field(
         default=RedisDsn("redis://localhost:6379/0")
     )
 
-    # Auth
-    jwt_secret_key: str = Field(default="CHANGE_ME_IN_PRODUCTION")
+    jwt_secret_key: str = Field(default="CHANGE_ME_IN_PRODUCTION", min_length=32)
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
 
-    # Security
     argon2_time_cost: int = 2
     argon2_memory_cost: int = 65536
     argon2_parallelism: int = 1
+    argon2_hash_len: int = 32
+    argon2_salt_len: int = 16
 
 
 settings = Settings()
