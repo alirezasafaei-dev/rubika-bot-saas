@@ -1,7 +1,9 @@
 # app/core/config.py
+from __future__ import annotations
+
 from typing import Annotated
 
-from pydantic import BeforeValidator, Field, PostgresDsn, RedisDsn
+from pydantic import BeforeValidator, Field, PostgresDsn, RedisDsn, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,6 +32,7 @@ class Settings(BaseSettings):
     app_name: str = "Rubika Bot SaaS"
     app_version: str = "0.1.0"
     debug: bool = False
+    environment: str = "development"
     api_v1_prefix: str = "/api/v1"
 
     database_url: Annotated[PostgresDsn, BeforeValidator(parse_postgres_dsn)] = Field(
@@ -41,16 +44,35 @@ class Settings(BaseSettings):
 
     jwt_secret_key: str = Field(default="CHANGE_ME_IN_PRODUCTION", min_length=32)
     jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 30
-    refresh_token_expire_days: int = 7
+    access_token_expire_minutes: int = Field(default=30, ge=1, le=1440)
+    refresh_token_expire_days: int = Field(default=7, ge=1, le=365)
 
-    argon2_time_cost: int = 2
-    argon2_memory_cost: int = 65536
-    argon2_parallelism: int = 1
-    argon2_hash_len: int = 32
-    argon2_salt_len: int = 16
+    argon2_time_cost: int = Field(default=2, ge=1)
+    argon2_memory_cost: int = Field(default=65536, ge=8192)
+    argon2_parallelism: int = Field(default=1, ge=1)
+    argon2_hash_len: int = Field(default=32, ge=16)
+    argon2_salt_len: int = Field(default=16, ge=8)
 
-    # --- Aliases برای backward compatibility با main.py قدیمی ---
+    @model_validator(mode="after")
+    def validate_security(self) -> "Settings":
+        insecure_values = {
+            "CHANGE_ME_IN_PRODUCTION",
+            "changeme",
+            "secret",
+            "default-secret",
+            "test-secret",
+            "",
+        }
+
+        if self.environment.lower() in {"production", "staging"}:
+            if self.jwt_secret_key.strip() in insecure_values:
+                raise ValueError(
+                    "jwt_secret_key is insecure. Set a strong secret in environment variables."
+                )
+
+        return self
+
+    # --- Aliases for backward compatibility ---
     @property
     def PROJECT_NAME(self) -> str:
         return self.app_name
@@ -66,6 +88,14 @@ class Settings(BaseSettings):
     @property
     def DEBUG(self) -> bool:
         return self.debug
+
+    @property
+    def SECRET_KEY(self) -> str:
+        return self.jwt_secret_key
+
+    @property
+    def ALGORITHM(self) -> str:
+        return self.jwt_algorithm
 
 
 settings = Settings()

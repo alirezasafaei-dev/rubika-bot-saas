@@ -1,4 +1,6 @@
 # app/repositories/base.py
+from datetime import datetime
+
 from typing import Generic, Sequence, TypeVar
 
 from sqlalchemy import select

@@ -1,54 +1,43 @@
-"""
-Authentication & authorisation service.
-
-Uses JWT (via app.core.security) for token management and
-stores refresh token hashes in the database for revocation.
-"""
+# app/services/auth_service.py
 from __future__ import annotations
 
 import hashlib
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 from fastapi import Depends, HTTPException, status
-from jose import JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.security import (
     create_access_token,
     create_refresh_token,
-    decode_token,
+    decode_access_token,
+    decode_refresh_token,
     hash_password,
     verify_password,
 )
-from app.db import get_db
+from app.db.session import get_db
 from app.models.refresh_token import RefreshToken as RefreshTokenModel
-from app.models.user import User
+from app.models.user import User, UserStatus
 from app.repositories.user_repository import UserRepository
-from app.schemas.auth import (
-    UserLogin,
-    UserPublic,
-    UserRegister,
-)
-
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-REFRESH_TOKEN_EXPIRE_DAYS = 30
+from app.schemas.auth import UserLogin, UserRegister
 
 
 class AuthService:
-    """Handles user registration, login, token lifecycle."""
+    """Handles user registration, login, token lifecycle, and current-user resolution."""
 
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
         self.user_repo = UserRepository(db)
 
-    # ── Register ─────────────────────────────────────────────────────
-
     async def register(self, payload: UserRegister) -> tuple[User, str, str]:
         """Create a new user and return (user, access_token, refresh_token)."""
-        # Check duplicate phone
-        existing = await self.user_repo.get_by_phone(payload.phone)
+        phone = payload.phone.strip()
+        username = payload.username.strip() if payload.username else None
+        full_name = payload.full_name.strip()
+
+        existing = await self.user_repo.get_by_phone(phone)
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -58,9 +47,8 @@ class AuthService:
                 },
             )
 
-        # Check duplicate username if provided
-        if payload.username:
-            existing_username = await self.user_repo.get_by_username(payload.username)
+        if username:
+            existing_username = await self.user_repo.get_by_username(username)
             if existing_username:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -70,28 +58,27 @@ class AuthService:
                     },
                 )
 
-        # Hash password & create user
         hashed_pw = hash_password(payload.password)
+
         user = await self.user_repo.create(
-            full_name=payload.full_name.strip(),
-            username=payload.username.strip() if payload.username else None,
-            phone=payload.phone,
-            password_hash=hashed_pw,
+            full_name=full_name,
+            username=username,
+            phone=phone,
+            hashed_password=hashed_pw,
         )
 
-        # Generate token pair
         access_token = create_access_token({"sub": str(user.id)})
         refresh_token = create_refresh_token({"sub": str(user.id)})
         await self._store_refresh_token(user.id, refresh_token)
 
         return user, access_token, refresh_token
 
-    # ── Login ────────────────────────────────────────────────────────
-
     async def login(self, payload: UserLogin) -> tuple[User, str, str]:
         """Authenticate user and return (user, access_token, refresh_token)."""
-        user = await self.user_repo.get_by_phone(payload.phone)
-        if not user or not verify_password(payload.password, user.password_hash):
+        phone = payload.phone.strip()
+        user = await self.user_repo.get_by_phone(phone)
+
+        if not user or not verify_password(payload.password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={
@@ -100,12 +87,21 @@ class AuthService:
                 },
             )
 
-        if user.status.value == "blocked":
+        if user.status == UserStatus.BLOCKED:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={
                     "code": "USER_BLOCKED",
                     "message": "Your account has been blocked.",
+                },
+            )
+
+        if user.status == UserStatus.DELETED or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "USER_INACTIVE",
+                    "message": "This account is inactive.",
                 },
             )
 
@@ -115,23 +111,21 @@ class AuthService:
 
         return user, access_token, refresh_token
 
-    # ── Refresh ──────────────────────────────────────────────────────
-
     async def refresh(self, refresh_token: str) -> str:
         """Validate a refresh token and return a new access token."""
-        # Decode JWT
         try:
-            payload = decode_token(refresh_token)
-            user_id_str: Optional[str] = payload.get("sub")
-            if user_id_str is None:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail={
-                        "code": "INVALID_REFRESH_TOKEN",
-                        "message": "Invalid refresh token.",
-                    },
-                )
-        except JWTError:
+            payload = decode_refresh_token(refresh_token)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "code": "INVALID_REFRESH_TOKEN",
+                    "message": "Invalid or expired refresh token.",
+                },
+            )
+
+        user_id_str = payload.get("sub")
+        if user_id_str is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={
@@ -140,13 +134,21 @@ class AuthService:
                 },
             )
 
-        user_id = int(user_id_str)
+        try:
+            user_id = int(user_id_str)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "code": "INVALID_REFRESH_TOKEN",
+                    "message": "Invalid refresh token subject.",
+                },
+            )
 
-        # Verify token is stored and not revoked
         token_hash = self._hash_token(refresh_token)
         stmt = select(RefreshTokenModel).where(
             RefreshTokenModel.token_hash == token_hash,
-            RefreshTokenModel.is_revoked == False,
+            RefreshTokenModel.is_revoked.is_(False),
         )
         result = await self.db.execute(stmt)
         stored = result.scalars().first()
@@ -160,29 +162,41 @@ class AuthService:
                 },
             )
 
-        # Check user exists and is active
-        user = await self.user_repo.get(user_id)
-        if not user or user.status.value == "deleted":
+        now = datetime.now(timezone.utc)
+        expires_at = stored.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+        if expires_at <= now:
+            stored.is_revoked = True
+            await self.db.commit()
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={
                     "code": "INVALID_REFRESH_TOKEN",
-                    "message": "User no longer exists.",
+                    "message": "Refresh token has expired.",
                 },
             )
 
-        # Issue new access token
+        user = await self.user_repo.get(user_id)
+        if not user or user.status in {UserStatus.DELETED, UserStatus.BLOCKED} or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "code": "INVALID_REFRESH_TOKEN",
+                    "message": "User is no longer active.",
+                },
+            )
+
         new_access_token = create_access_token({"sub": str(user_id)})
         return new_access_token
-
-    # ── Logout ───────────────────────────────────────────────────────
 
     async def logout(self, refresh_token: str) -> None:
         """Revoke a refresh token."""
         token_hash = self._hash_token(refresh_token)
         stmt = select(RefreshTokenModel).where(
             RefreshTokenModel.token_hash == token_hash,
-            RefreshTokenModel.is_revoked == False,
+            RefreshTokenModel.is_revoked.is_(False),
         )
         result = await self.db.execute(stmt)
         stored = result.scalars().first()
@@ -199,22 +213,11 @@ class AuthService:
         stored.is_revoked = True
         await self.db.commit()
 
-    # ── Get current user ─────────────────────────────────────────────
-
     async def get_current_user(self, token: str) -> User:
         """Decode an access token and return the corresponding user."""
         try:
-            payload = decode_token(token)
-            user_id_str: Optional[str] = payload.get("sub")
-            if user_id_str is None:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail={
-                        "code": "INVALID_TOKEN",
-                        "message": "Token is missing subject.",
-                    },
-                )
-        except JWTError:
+            payload = decode_access_token(token)
+        except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={
@@ -223,9 +226,29 @@ class AuthService:
                 },
             )
 
-        user_id = int(user_id_str)
+        user_id_str = payload.get("sub")
+        if user_id_str is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "code": "INVALID_TOKEN",
+                    "message": "Token is missing subject.",
+                },
+            )
+
+        try:
+            user_id = int(user_id_str)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "code": "INVALID_TOKEN",
+                    "message": "Token subject is invalid.",
+                },
+            )
+
         user = await self.user_repo.get(user_id)
-        if not user:
+        if not user or user.status == UserStatus.DELETED:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
@@ -233,14 +256,23 @@ class AuthService:
                     "message": "User not found.",
                 },
             )
-        return user
 
-    # ── Helpers ──────────────────────────────────────────────────────
+        if user.status == UserStatus.BLOCKED or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "USER_INACTIVE",
+                    "message": "User is inactive.",
+                },
+            )
+
+        return user
 
     async def _store_refresh_token(self, user_id: int, token: str) -> None:
         """Persist a refresh token hash in the database."""
         token_hash = self._hash_token(token)
-        expires_at = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)
+
         rt = RefreshTokenModel(
             user_id=user_id,
             token_hash=token_hash,
@@ -251,11 +283,9 @@ class AuthService:
 
     @staticmethod
     def _hash_token(token: str) -> str:
-        """Return SHA-256 hex digest of *token*."""
-        return hashlib.sha256(token.encode()).hexdigest()
+        """Return SHA-256 hex digest of token."""
+        return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
-
-# ── FastAPI dependency ──────────────────────────────────────────────
 
 async def get_auth_service(db: AsyncSession = Depends(get_db)) -> AuthService:
     """Provide an AuthService instance wired to the current DB session."""
