@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
 
     database_url: Annotated[PostgresDsn, BeforeValidator(parse_postgres_dsn)] = Field(
-        default=PostgresDsn("postgresql+psycopg://user:pass@localhost:5432/rubika_bot")
+        default=PostgresDsn("postgresql+asyncpg://user:pass@localhost:5432/rubika_bot")
     )
     redis_url: Annotated[RedisDsn, BeforeValidator(parse_redis_dsn)] = Field(
         default=RedisDsn("redis://localhost:6379/0")
