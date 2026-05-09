@@ -25,4 +25,3 @@ Import -> File -> `openapi.yaml`
 - اگر Rubika webhook امضای اختصاصی دارد، header validation دقیق‌تر شود
 
 ---
-

@@ -1,80 +1,136 @@
-"""
-Pytest fixtures for the whole test suite.
-
-Only imports models that have been implemented so far (Phase 3).
-"""
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncGenerator, Generator
+import os
+from collections.abc import AsyncGenerator
 
 import pytest
-import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import NullPool, create_engine, event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.core.config import settings
-from app.db.base import Base
-
-# ── Import only currently-existing models ───────────────────────────
-# Phase 3 models – add more as later phases are implemented.
-from app.models.user import User  # noqa: F401
-from app.models.workspace import Workspace  # noqa: F401
-from app.models.workspace import WorkspaceMember  # noqa: F401
-# ────────────────────────────────────────────────────────────────────
-
+from app.api.deps import get_db
+from app.core.security import hash_password
+from app.db.base_class import Base
 from app.main import app
+from app.models.channel import Channel
+from app.models.user import User
+from app.models.workspace import Workspace
+from app.schemas.auth import LoginRequest
 
-# Use a separate test database
-TEST_DATABASE_URL = settings.database_url + "_test"
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    "",
+)
+if not TEST_DATABASE_URL.startswith("sqlite+aiosqlite://"):
+    TEST_DATABASE_URL = "sqlite+aiosqlite:///./rubika_test.db"
 
-engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)
-TestSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+test_engine = create_async_engine(TEST_DATABASE_URL, echo=False, future=True)
+TestSessionLocal = async_sessionmaker(
+    bind=test_engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
+)
 
 
 @pytest.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    """Create a single event loop for the whole session."""
-    loop = asyncio.new_event_loop()
+def event_loop() -> AsyncGenerator[asyncio.AbstractEventLoop, None]:
+    policy = asyncio.get_event_loop_policy()
+    loop = policy.new_event_loop()
     yield loop
     loop.close()
 
 
-@pytest_asyncio.fixture(autouse=True)
-async def setup_database() -> AsyncGenerator[None, None]:
-    """Create all tables before each test and drop them after."""
-    async with engine.begin() as conn:
+@pytest.fixture(scope="function")
+async def db_session() -> AsyncGenerator[AsyncSession, None]:
+    async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with engine.begin() as conn:
+
+    async with TestSessionLocal() as session:
+        yield session
+
+    async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
 
-@pytest_asyncio.fixture
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    """Provide a clean DB session per test."""
-    async with TestSessionLocal() as session:
-        yield session
-        await session.rollback()
+@pytest.fixture(scope="function")
+async def async_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        yield db_session
 
+    app.dependency_overrides[get_db] = override_get_db
 
-@pytest_asyncio.fixture
-async def client() -> AsyncGenerator[AsyncClient, None]:
-    """Provide an async HTTP client for the FastAPI app."""
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        yield client
+
+    app.dependency_overrides.clear()
 
 
-# ── Helper to override DB dependency ────────────────────────────────
-from app.db import get_db  # noqa: E402
+@pytest.fixture(scope="function")
+async def client(async_client: AsyncClient) -> AsyncClient:
+    return async_client
 
 
-async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Override the main ``get_db`` dependency with the test DB."""
-    async with TestSessionLocal() as session:
-        yield session
+@pytest.fixture(scope="function")
+async def auth_headers(async_client: AsyncClient, test_user: User) -> dict[str, str]:
+    login_data = LoginRequest(phone=test_user.phone, password="testpassword")
+    response = await async_client.post(
+        "/api/v1/auth/login", json=login_data.model_dump()
+    )
+    token = response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
 
 
-app.dependency_overrides[get_db] = override_get_db
+@pytest.fixture(scope="function")
+async def test_user(db_session: AsyncSession) -> User:
+    user = User(
+        full_name="Test User",
+        username="testuser",
+        phone="+989123456789",
+        hashed_password=hash_password("testpassword"),
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest.fixture(scope="function")
+async def test_workspace(db_session: AsyncSession, test_user: User) -> Workspace:
+    workspace = Workspace(
+        owner_id=test_user.id,
+        name="Test Workspace",
+        description="A test workspace",
+    )
+    db_session.add(workspace)
+    await db_session.commit()
+    await db_session.refresh(workspace)
+    return workspace
+
+
+@pytest.fixture(scope="function")
+async def workspace(test_workspace: Workspace) -> Workspace:
+    return test_workspace
+
+
+@pytest.fixture(scope="function")
+async def test_channel(
+    db_session: AsyncSession,
+    test_workspace: Workspace,
+) -> Channel:
+    channel = Channel(
+        workspace_id=test_workspace.id,
+        rubika_channel_id="c12345",
+        name="Test Channel",
+        description="A test channel",
+    )
+    db_session.add(channel)
+    await db_session.commit()
+    await db_session.refresh(channel)
+    return channel
+
+
+@pytest.fixture(scope="function")
+async def channel(test_channel: Channel) -> Channel:
+    return test_channel

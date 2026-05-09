@@ -1,6 +1,6 @@
 # Project Execution Guide
 
-این سند مرجع اجرایی اصلی پروژه Rubika Bot SaaS - MVP است.  
+این سند مرجع اجرایی اصلی پروژه Rubika Bot SaaS - MVP است.
 تمام تصمیم‌های فنی، ساختار کد، API، دیتابیس، تست، امنیت و استقرار باید با این سند و مستندات اصلی پروژه سازگار باشند.
 
 ---
@@ -574,7 +574,7 @@ MVP باید روی یک سرور لینوکسی self-hosted قابل استقر
 - Commit
 - Step Report
 
-توضیح‌ها فارسی باشند.  
+توضیح‌ها فارسی باشند.
 کد، دستور، نام فایل و commit message انگلیسی باشند.
 
 ---
@@ -591,6 +591,18 @@ MVP باید روی یک سرور لینوکسی self-hosted قابل استقر
 - فایل‌های جدید کامل باشند
 - نحوه اجرا گفته شده باشد
 - commit message پیشنهاد شده باشد
+
+### 23.1 Operational Checkpoint: Scheduled Posts & Test Infrastructure
+
+- `tests/test_scheduled_posts.py` شامل create/list/update/cancel/delete/logs flow است و باید همواره پاس شود.
+- در تست‌ها، `tests/conftest.py` داده‌های fixture را به‌گونه‌ای می‌سازد که تداخل `UNIQUE` رخ ندهد.
+- برای اجرای سریع local باید از SQLite تستی استفاده شود (`TEST_DATABASE_URL`).
+
+#### Commands to run before merge
+
+- `uv run ruff check .`
+- `uv run mypy app/`
+- `uv run pytest`
 
 ---
 
@@ -617,6 +629,5 @@ MVP باید روی یک سرور لینوکسی self-hosted قابل استقر
 
 ## 25. Final Rule
 
-اگر بین سرعت و کیفیت تضاد بود، نسخه ساده‌تر اما production-safe انتخاب شود.  
+اگر بین سرعت و کیفیت تضاد بود، نسخه ساده‌تر اما production-safe انتخاب شود.
 اگر بین قابلیت بیشتر و انطباق با MVP تضاد بود، انطباق با MVP اولویت مطلق دارد.
-

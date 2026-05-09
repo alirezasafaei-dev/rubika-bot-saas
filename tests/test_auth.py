@@ -8,15 +8,15 @@ async def test_register(client: AsyncClient):
     response = await client.post(
         "/api/v1/auth/register",
         json={
-            "email": "test@example.com",
+            "phone": "+989111111111",
             "password": "StrongPassword123",
             "full_name": "Test User",
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 201
     data = response.json()
-    assert data["email"] == "test@example.com"
+    assert data["phone"] == "+989111111111"
 
 
 @pytest.mark.asyncio
@@ -24,7 +24,7 @@ async def test_login(client: AsyncClient):
     await client.post(
         "/api/v1/auth/register",
         json={
-            "email": "login@example.com",
+            "phone": "+989222222222",
             "password": "StrongPassword123",
             "full_name": "Login User",
         },
@@ -33,7 +33,7 @@ async def test_login(client: AsyncClient):
     response = await client.post(
         "/api/v1/auth/login",
         json={
-            "email": "login@example.com",
+            "phone": "+989222222222",
             "password": "StrongPassword123",
         },
     )
@@ -50,7 +50,7 @@ async def test_me(client: AsyncClient):
     await client.post(
         "/api/v1/auth/register",
         json={
-            "email": "me@example.com",
+            "phone": "+989333333333",
             "password": "StrongPassword123",
             "full_name": "Me User",
         },
@@ -59,7 +59,7 @@ async def test_me(client: AsyncClient):
     login = await client.post(
         "/api/v1/auth/login",
         json={
-            "email": "me@example.com",
+            "phone": "+989333333333",
             "password": "StrongPassword123",
         },
     )

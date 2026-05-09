@@ -22,6 +22,10 @@ ENV/
 # Databases (if any)
 *.sqlite3
 *.db
+rubika_test.db
+
+# Editor and backup artifacts
+*.bak
 
 # OS files
 .DS_Store

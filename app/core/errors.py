@@ -1,8 +1,8 @@
 # app/core/errors.py
-from enum import Enum
+from enum import StrEnum
 
 
-class ErrorCode(str, Enum):
+class ErrorCode(StrEnum):
     # General
     INTERNAL_ERROR = "INTERNAL_ERROR"
     VALIDATION_ERROR = "VALIDATION_ERROR"
@@ -48,7 +48,9 @@ class ErrorCode(str, Enum):
 
 
 class AppException(Exception):
-    def __init__(self, error_code: ErrorCode, message: str | None = None, status_code: int = 400):
+    def __init__(
+        self, error_code: ErrorCode, message: str | None = None, status_code: int = 400
+    ):
         self.error_code = error_code
         self.message = message or error_code.value.replace("_", " ").title()
         self.status_code = status_code

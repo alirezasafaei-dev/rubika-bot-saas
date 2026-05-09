@@ -1,17 +1,41 @@
+# app/core/exceptions.py
 from .errors import (
-    ConflictException,
-    NotFoundException,
-    ForbiddenException,
-    UnauthorizedException,
-    UnprocessableEntity,
-    InternalServerError,
+    AppException,
+    ConflictError,
+    ErrorCode,
+    NotFoundError,
+    PermissionDeniedError,
+    UnauthorizedError,
 )
 
+# Aliases for backward compatibility
+ConflictException = ConflictError
+NotFoundException = NotFoundError
+ForbiddenException = PermissionDeniedError
+UnauthorizedException = UnauthorizedError
+
+
+class UnprocessableEntity(AppException):
+    def __init__(self, error_code: ErrorCode, message: str | None = None):
+        super().__init__(error_code, message, status_code=422)
+
+
+class InternalServerError(AppException):
+    def __init__(self, error_code: ErrorCode, message: str | None = None):
+        super().__init__(error_code, message, status_code=500)
+
+
 __all__ = [
+    "AppException",
+    "ConflictError",
     "ConflictException",
-    "NotFoundException",
+    "ErrorCode",
     "ForbiddenException",
-    "UnauthorizedException",
-    "UnprocessableEntity",
     "InternalServerError",
+    "NotFoundError",
+    "NotFoundException",
+    "PermissionDeniedError",
+    "UnauthorizedException",
+    "UnauthorizedError",
+    "UnprocessableEntity",
 ]

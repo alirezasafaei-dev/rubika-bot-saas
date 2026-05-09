@@ -1,6 +1,6 @@
 # MVP Roadmap
 
-این سند نقشه‌راه اجرایی پروژه Rubika Bot SaaS - MVP است.  
+این سند نقشه‌راه اجرایی پروژه Rubika Bot SaaS - MVP است.
 هدف این نقشه‌راه این است که پروژه مرحله‌به‌مرحله، قابل تست، قابل commit و production-oriented پیاده‌سازی شود.
 
 ---
@@ -761,7 +761,7 @@ text
 پیشنهاد این پروژه: مسیر production-oriented.
 
 
-Run  
+Run
 ```bash
 $EDITOR docs/PROJECT_EXECUTION_GUIDE.md
 $EDITOR docs/MVP_ROADMAP.md

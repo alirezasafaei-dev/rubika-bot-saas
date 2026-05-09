@@ -1,87 +1,62 @@
-# app/api/v1/endpoints/auth.py
-"""
-Auth API endpoints: register, login, refresh, me, logout.
-"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from typing import Annotated
 
+from fastapi import APIRouter, Depends, status
+
+from app.api.deps import get_auth_service, get_current_user
+from app.models.user import User
 from app.schemas.auth import (
-    AuthResponse,
-    LogoutRequest,
-    MessageResponse,
-    RefreshResponse,
-    RefreshTokenRequest,
-    UserLogin,
-    UserPublic,
-    UserRegister,
+    LoginRequest,
+    RefreshRequest,
+    RegisterRequest,
+    TokenResponse,
+    UserResponse,
 )
-from app.services.auth_service import AuthService, get_auth_service
+from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-security_scheme = HTTPBearer(auto_error=False)
 
 
-@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def register(
-    payload: UserRegister,
-    service: AuthService = Depends(get_auth_service),
-) -> AuthResponse:
-    user, access_token, refresh_token = await service.register(payload)
-    return AuthResponse(
-        message="User registered successfully",
-        user=UserPublic.model_validate(user),
-        access_token=access_token,
-        refresh_token=refresh_token,
-    )
+    payload: RegisterRequest,
+    service: Annotated[AuthService, Depends(get_auth_service)],
+) -> UserResponse:
+    user = await service.register(payload=payload)
+    return UserResponse.model_validate(user)
 
 
-@router.post("/login", response_model=AuthResponse)
+@router.post("/login", response_model=TokenResponse)
 async def login(
-    payload: UserLogin,
-    service: AuthService = Depends(get_auth_service),
-) -> AuthResponse:
-    user, access_token, refresh_token = await service.login(payload)
-    return AuthResponse(
-        message="Login successful",
-        user=UserPublic.model_validate(user),
-        access_token=access_token,
-        refresh_token=refresh_token,
-    )
+    payload: LoginRequest,
+    service: Annotated[AuthService, Depends(get_auth_service)],
+) -> TokenResponse:
+    return await service.login(phone=payload.phone, password=payload.password)
 
 
-@router.post("/refresh", response_model=RefreshResponse)
-async def refresh(
-    payload: RefreshTokenRequest,
-    service: AuthService = Depends(get_auth_service),
-) -> RefreshResponse:
-    new_access_token = await service.refresh(payload.refresh_token)
-    return RefreshResponse(
-        message="Token refreshed",
-        access_token=new_access_token,
-    )
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_token(
+    payload: RefreshRequest,
+    service: Annotated[AuthService, Depends(get_auth_service)],
+) -> TokenResponse:
+    return await service.refresh_token(refresh_token=payload.refresh_token)
 
 
-@router.get("/me", response_model=UserPublic)
-async def get_me(
-    credentials: HTTPAuthorizationCredentials | None = Depends(security_scheme),
-    service: AuthService = Depends(get_auth_service),
-) -> UserPublic:
-    if credentials is None or not credentials.credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"code": "MISSING_TOKEN", "message": "Authorization header required."},
-        )
-
-    user = await service.get_current_user(credentials.credentials)
-    return UserPublic.model_validate(user)
-
-
-@router.post("/logout", response_model=MessageResponse)
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
-    payload: LogoutRequest,
-    service: AuthService = Depends(get_auth_service),
-) -> MessageResponse:
-    await service.logout(payload.refresh_token)
-    return MessageResponse(message="Logged out successfully")
+    service: Annotated[AuthService, Depends(get_auth_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> None:
+    await service.logout(user=current_user)
+
+
+@router.get("/me", response_model=UserResponse)
+async def read_current_user(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> UserResponse:
+    return UserResponse.model_validate(current_user)

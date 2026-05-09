@@ -1,30 +1,23 @@
-"""
-User-specific repository.
-"""
+# app/repositories/user_repository.py
 from __future__ import annotations
 
-from typing import Optional
-
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
 from app.repositories.base import BaseRepository
 
 
 class UserRepository(BaseRepository[User]):
-    """Data-access layer for the User model."""
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(User, session)
 
-    def __init__(self, db) -> None:
-        super().__init__(db, User)
-
-    async def get_by_phone(self, phone: str) -> Optional[User]:
-        """Find a user by phone number."""
-        stmt = select(User).where(User.phone == phone)
-        result = await self.db.execute(stmt)
-        return result.scalars().first()
-
-    async def get_by_username(self, username: str) -> Optional[User]:
-        """Find a user by username."""
+    async def get_by_username(self, username: str) -> User | None:
         stmt = select(User).where(User.username == username)
-        result = await self.db.execute(stmt)
-        return result.scalars().first()
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_by_phone(self, phone: str) -> User | None:
+        stmt = select(User).where(User.phone == phone)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()

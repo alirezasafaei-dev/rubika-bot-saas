@@ -1,4 +1,3 @@
-# app/models/user.py
 from __future__ import annotations
 
 import enum
@@ -12,16 +11,16 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.refresh_token import RefreshToken
-    from app.models.workspace import WorkspaceMember
+    from app.models.workspace import Workspace, WorkspaceMember
 
 
-class UserRole(str, enum.Enum):
+class UserRole(enum.StrEnum):
     OWNER = "owner"
     ADMIN = "admin"
     MEMBER = "member"
 
 
-class UserStatus(str, enum.Enum):
+class UserStatus(enum.StrEnum):
     ACTIVE = "active"
     BLOCKED = "blocked"
     DELETED = "deleted"
@@ -31,8 +30,12 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    phone: Mapped[str] = mapped_column(String(20), unique=True, index=True, nullable=False)
-    username: Mapped[str | None] = mapped_column(String(100), unique=True, index=True, nullable=True)
+    phone: Mapped[str] = mapped_column(
+        String(20), unique=True, index=True, nullable=False
+    )
+    username: Mapped[str | None] = mapped_column(
+        String(100), unique=True, index=True, nullable=True
+    )
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str] = mapped_column(String(150), nullable=False)
 
@@ -60,13 +63,18 @@ class User(Base):
         nullable=False,
     )
 
-    workspace_members: Mapped[list["WorkspaceMember"]] = relationship(
+    owned_workspaces: Mapped[list[Workspace]] = relationship(
+        "Workspace",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+        foreign_keys="Workspace.owner_id",
+    )
+    workspace_members: Mapped[list[WorkspaceMember]] = relationship(
         "WorkspaceMember",
         back_populates="user",
         cascade="all, delete-orphan",
     )
-
-    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
+    refresh_tokens: Mapped[list[RefreshToken]] = relationship(
         "RefreshToken",
         back_populates="user",
         cascade="all, delete-orphan",

@@ -20,48 +20,48 @@ def upgrade() -> None:
     # 1. Fix users table - remove duplicate hashed_password column
     conn = op.get_bind()
     result = conn.execute(sa.text("""
-        SELECT column_name 
-        FROM information_schema.columns 
+        SELECT column_name
+        FROM information_schema.columns
         WHERE table_name = 'users' AND column_name = 'hashed_password'
     """)).fetchone()
-    
+
     conn.execute(sa.text("DROP INDEX IF EXISTS ix_workspaces_owner_id"))
-    
+
     if result:
         op.drop_column('users', 'password_hash')
     else:
         op.alter_column('users', 'password_hash', new_column_name='hashed_password')
-    
+
     # 2. Make full_name NOT NULL
     op.execute("UPDATE users SET full_name = phone WHERE full_name IS NULL OR full_name = ''")
     op.alter_column('users', 'full_name',
                     existing_type=sa.String(255),
                     nullable=False,
                     server_default='')
-    
+
     # 3. Add is_active column
     op.add_column('users', sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'))
-    
+
     # 4. Rename owner_id to created_by_user_id
     op.alter_column('workspaces', 'owner_id', new_column_name='created_by_user_id')
     op.create_index(op.f('ix_workspaces_owner_id'), 'workspaces', ['created_by_user_id'])
-    
+
     # 5. Add slug and description
     op.add_column('workspaces', sa.Column('slug', sa.String(120), nullable=False, server_default=''))
     op.execute("""
-        UPDATE workspaces 
+        UPDATE workspaces
         SET slug = LOWER(REGEXP_REPLACE(name, '[^a-zA-Z0-9]+', '-', 'g'))
         WHERE slug = ''
     """)
     op.alter_column('workspaces', 'slug', server_default=None)
     op.create_index(op.f('ix_workspaces_slug'), 'workspaces', ['slug'], unique=True)
-    
+
     op.add_column('workspaces', sa.Column('description', sa.Text(), nullable=True))
-    
+
     # 6. Update workspace_members table
     op.alter_column('workspace_members', 'created_at', new_column_name='joined_at')
     op.drop_column('workspace_members', 'updated_at')
-    
+
     # 7. Add refresh_tokens table
     op.create_table('refresh_tokens',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -80,11 +80,11 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Drop refresh_tokens table
     op.drop_table('refresh_tokens')
-    
+
     # Restore workspace_members
     op.add_column('workspace_members', sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False))
     op.alter_column('workspace_members', 'joined_at', new_column_name='created_at')
-    
+
     # Remove columns from workspaces
     op.drop_column('workspaces', 'description')
     op.drop_index(op.f('ix_workspaces_slug'), table_name='workspaces')
@@ -92,7 +92,7 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_workspaces_owner_id'), table_name='workspaces')
     op.alter_column('workspaces', 'created_by_user_id', new_column_name='owner_id')
     op.create_index(op.f('ix_workspaces_owner_id'), 'workspaces', ['owner_id'])
-    
+
     # Remove columns from users
     op.drop_column('users', 'is_active')
     op.alter_column('users', 'full_name',
@@ -102,8 +102,8 @@ def downgrade() -> None:
     # Check if password_hash exists
     conn = op.get_bind()
     result = conn.execute(sa.text("""
-        SELECT column_name 
-        FROM information_schema.columns 
+        SELECT column_name
+        FROM information_schema.columns
         WHERE table_name = 'users' AND column_name = 'password_hash'
     """)).fetchone()
     if not result:

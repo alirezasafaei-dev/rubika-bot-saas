@@ -1,102 +1,88 @@
 # app/services/channel_service.py
-from typing import Optional
+from __future__ import annotations
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.core.errors import ErrorCode, NotFoundError, ConflictError, PermissionDeniedError
+from app.core.errors import AppException, ErrorCode
 from app.models.channel import Channel
-from app.models.workspace import WorkspaceMember
 from app.repositories.base import BaseRepository
+from app.schemas.channel import ChannelCreate, ChannelUpdate
 
 
 class ChannelService:
-    def __init__(self, db: AsyncSession, channel_repo: BaseRepository[Channel]):
-        self.db = db
-        self.channel_repo = channel_repo
-
-    async def _check_membership(self, workspace_id: int, user_id: int, require_admin: bool = False) -> WorkspaceMember:
-        """بررسی عضویت کاربر در workspace و بازگرداندن عضو"""
-        result = await self.db.execute(
-            select(WorkspaceMember).filter(
-                WorkspaceMember.workspace_id == workspace_id,
-                WorkspaceMember.user_id == user_id,
-                WorkspaceMember.deleted_at.is_(None)
-            )
-        )
-        member = result.scalar_one_or_none()
-        if not member:
-            raise PermissionDeniedError(ErrorCode.NOT_WORKSPACE_MEMBER)
-        if require_admin and member.role not in ("owner", "admin"):
-            raise PermissionDeniedError(ErrorCode.NOT_WORKSPACE_ADMIN)
-        return member
+    def __init__(self, repository: BaseRepository[Channel]) -> None:
+        self.repository = repository
 
     async def create_channel(
         self,
+        *,
         workspace_id: int,
-        user_id: int,
-        rubika_channel_id: str,
-        name: str,
-        description: Optional[str] = None,
+        payload: ChannelCreate,
     ) -> Channel:
-        await self._check_membership(workspace_id, user_id, require_admin=True)
-
-        # بررسی تکراری نبودن
-        existing = await self.channel_repo.list(
-            rubika_channel_id=rubika_channel_id,
+        existing = await self.repository.get_one_by(
             workspace_id=workspace_id,
+            rubika_channel_id=payload.rubika_channel_id,
         )
-        if existing:
-            raise ConflictError(ErrorCode.CHANNEL_ALREADY_EXISTS)
+        if existing is not None:
+            raise AppException(
+                ErrorCode.CONFLICT, "Channel already exists in workspace"
+            )
 
-        channel = await self.channel_repo.create(
+        return await self.repository.create(
             workspace_id=workspace_id,
-            rubika_channel_id=rubika_channel_id,
-            name=name,
-            description=description,
-            is_active=True,
+            rubika_channel_id=payload.rubika_channel_id,
+            name=payload.name,
+            description=payload.description,
         )
-        return channel
 
     async def list_channels(
         self,
+        *,
         workspace_id: int,
-        user_id: int,
-        offset: int = 0,
-        limit: int = 100,
-    ) -> list[Channel]:
-        await self._check_membership(workspace_id, user_id)
-        channels = await self.channel_repo.list(
-            offset=offset,
-            limit=limit,
+        page: int,
+        limit: int,
+    ) -> tuple[list[Channel], int]:
+        items = await self.repository.list(
             workspace_id=workspace_id,
+            page=page,
+            limit=limit,
+            order_by=Channel.id.desc(),
         )
-        return list(channels)
+        total = await self.repository.count(workspace_id=workspace_id)
+        return list(items), total
 
-    async def get_channel(self, channel_id: int, workspace_id: int, user_id: int) -> Channel:
-        await self._check_membership(workspace_id, user_id)
-        try:
-            channel = await self.channel_repo.get(id=channel_id, workspace_id=workspace_id)
-        except NotFoundError:
-            raise NotFoundError(ErrorCode.CHANNEL_NOT_FOUND)
+    async def get_channel(
+        self,
+        *,
+        workspace_id: int,
+        channel_id: int,
+    ) -> Channel:
+        channel = await self.repository.get_one_by(
+            id=channel_id, workspace_id=workspace_id
+        )
+        if channel is None:
+            raise AppException(ErrorCode.NOT_FOUND, "Channel not found")
         return channel
 
     async def update_channel(
         self,
-        channel_id: int,
+        *,
         workspace_id: int,
-        user_id: int,
-        **data,
+        channel_id: int,
+        payload: ChannelUpdate,
     ) -> Channel:
-        await self._check_membership(workspace_id, user_id, require_admin=True)
-        channel = await self.get_channel(channel_id, workspace_id, user_id)
-        updated = await self.channel_repo.update(channel, **data)
-        return updated
+        channel = await self.get_channel(
+            workspace_id=workspace_id, channel_id=channel_id
+        )
 
-    async def delete_channel(self, channel_id: int, workspace_id: int, user_id: int) -> None:
-        await self._check_membership(workspace_id, user_id, require_admin=True)
-        channel = await self.get_channel(channel_id, workspace_id, user_id)
-        await self.channel_repo.soft_delete(id=channel_id)
+        data = payload.model_dump(exclude_unset=True)
+        return await self.repository.update(channel, **data)
 
-    async def get_channels_count(self, workspace_id: int) -> int:
-        return await self.channel_repo.count(workspace_id=workspace_id)
+    async def delete_channel(
+        self,
+        *,
+        workspace_id: int,
+        channel_id: int,
+    ) -> None:
+        channel = await self.get_channel(
+            workspace_id=workspace_id, channel_id=channel_id
+        )
+        await self.repository.soft_delete(channel)
