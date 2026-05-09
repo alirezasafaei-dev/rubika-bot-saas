@@ -4,6 +4,7 @@ from app.api.v1.endpoints import (
     channels,
     filters,
     scheduled_posts,
+    webhooks,
     workspaces,
 )
 
@@ -11,6 +12,7 @@ __all__ = [
     "auth",
     "channels",
     "filters",
+    "webhooks",
     "scheduled_posts",
     "workspaces",
     "auto_replies",
