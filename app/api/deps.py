@@ -19,6 +19,7 @@ from app.services.auth_service import AuthService
 from app.services.auto_reply_service import AutoReplyService
 from app.services.channel_service import ChannelService
 from app.services.filter_service import FilterService
+from app.services.report_service import ReportService
 from app.services.workspace_service import WorkspaceService
 
 # OAuth2 scheme for token retrieval
@@ -98,6 +99,12 @@ def get_filter_service(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> FilterService:
     return FilterService(db_session=db)
+
+
+def get_report_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ReportService:
+    return ReportService(db_session=db)
 
 
 # ── Current User ──────────────────────────────────────────────────────

@@ -14,7 +14,7 @@ from app.db.base_class import Base
 from app.main import app
 from app.models.channel import Channel
 from app.models.user import User
-from app.models.workspace import Workspace
+from app.models.workspace import Workspace, WorkspaceMember
 from app.schemas.auth import LoginRequest
 
 TEST_DATABASE_URL = os.getenv(
@@ -112,6 +112,19 @@ async def test_workspace(db_session: AsyncSession, test_user: User) -> Workspace
 @pytest.fixture(scope="function")
 async def workspace(test_workspace: Workspace) -> Workspace:
     return test_workspace
+
+
+@pytest.fixture(scope="function")
+async def workspace_member(
+    db_session: AsyncSession, test_workspace: Workspace, test_user: User
+) -> WorkspaceMember:
+    member = WorkspaceMember(
+        workspace_id=test_workspace.id, user_id=test_user.id, role="owner"
+    )
+    db_session.add(member)
+    await db_session.commit()
+    await db_session.refresh(member)
+    return member
 
 
 @pytest.fixture(scope="function")
