@@ -1,213 +1,86 @@
-# Auto Reply API
+# Auto Replies API
 
-## 1. Create Auto Reply Rule
+## Endpoints
 
-### Endpoint
-```http
-POST /api/v1/workspaces/{workspace_id}/channels/{channel_id}/auto-replies
+### Create Rule
+`POST /api/v1/workspaces/{workspace_id}/channels/{channel_id}/auto-replies`
 
-### Request Body
-json
+Body:
+
+```json
 {
-  "title": "Price Reply",
-  "match_type": "contains",
-  "reply_text": "برای دریافت تعرفه، لطفاً به پیام پین‌شده مراجعه کنید.",
-  "priority": 10,
-  "is_active": true,
-  "keywords": ["قیمت", "تعرفه", "هزینه"]
+  "trigger_text": "hello",
+  "reply_text": "hi there",
+  "is_active": true
 }
+```
 
-### Validation
-- `title`: required
-- `match_type`: `exact` or `contains`
-- `reply_text`: required
-- `priority`: integer
-- `keywords`: array, at least 1 item
-
-### Response
-json
-{
-  "success": true,
-  "message": "Auto reply rule created successfully",
-  "data": {
-"id": 1,
-"title": "Price Reply",
-"match_type": "contains",
-"reply_text": "برای دریافت تعرفه، لطفاً به پیام پین‌شده مراجعه کنید.",
-"priority": 10,
-"is_active": true,
-"keywords": [
-"قیمت",
-"تعرفه",
-"هزینه"
-]
-  }
-}
+Response: `AutoReplyResponse`
 
 ---
 
-## 2. List Auto Reply Rules
+### List Rules
+`GET /api/v1/workspaces/{workspace_id}/channels/{channel_id}/auto-replies?page=1&limit=20&is_active=true`
 
-### Endpoint
-http
-GET /api/v1/workspaces/{workspace_id}/channels/{channel_id}/auto-replies?page=1&limit=20&is_active=true
+Response:
 
-### Response
-json
+```json
 {
-  "success": true,
-  "message": "OK",
-  "data": {
-"items": [
-{
-"id": 1,
-"title": "Price Reply",
-"match_type": "contains",
-"reply_text": "برای دریافت تعرفه، لطفاً به پیام پین‌شده مراجعه کنید.",
-"priority": 10,
-"is_active": true,
-"keywords": ["قیمت", "تعرفه", "هزینه"]
+  "items": [],
+  "page": 1,
+  "limit": 20,
+  "total": 0
 }
-],
-"pagination": {
-"page": 1,
-"limit": 20,
-"total_items": 1,
-"total_pages": 1
-}
-  }
-}
+```
 
 ---
 
-## 3. Get Auto Reply Rule Detail
-
-### Endpoint
-http
-GET /api/v1/workspaces/{workspace_id}/channels/{channel_id}/auto-replies/{rule_id}
-
-### Response
-json
-{
-  "success": true,
-  "message": "OK",
-  "data": {
-"id": 1,
-"title": "Price Reply",
-"match_type": "contains",
-"reply_text": "برای دریافت تعرفه، لطفاً به پیام پین‌شده مراجعه کنید.",
-"priority": 10,
-"is_active": true,
-"keywords": ["قیمت", "تعرفه", "هزینه"]
-  }
-}
+### Get Rule
+`GET /api/v1/workspaces/{workspace_id}/channels/{channel_id}/auto-replies/{rule_id}`
 
 ---
 
-## 4. Update Auto Reply Rule
+### Update Rule
+`PATCH /api/v1/workspaces/{workspace_id}/channels/{channel_id}/auto-replies/{rule_id}`
 
-### Endpoint
-http
-PATCH /api/v1/workspaces/{workspace_id}/channels/{channel_id}/auto-replies/{rule_id}
+Body (optional fields):
 
-### Request Body
-json
+```json
 {
-  "title": "Updated Price Reply",
-  "match_type": "contains",
-  "reply_text": "برای دریافت تعرفه جدید، به پست آخر مراجعه کنید.",
-  "priority": 5,
-  "is_active": true,
-  "keywords": ["قیمت", "تعرفه"]
-}
-
-### Response
-json
-{
-  "success": true,
-  "message": "Auto reply rule updated successfully",
-  "data": {
-"id": 1,
-"title": "Updated Price Reply",
-"match_type": "contains",
-"reply_text": "برای دریافت تعرفه جدید، به پست آخر مراجعه کنید.",
-"priority": 5,
-"is_active": true,
-"keywords": ["قیمت", "تعرفه"]
-  }
-}
-
----
-
-## 5. Toggle Auto Reply Rule
-
-### Endpoint
-http
-POST /api/v1/workspaces/{workspace_id}/channels/{channel_id}/auto-replies/{rule_id}/toggle
-
-### Request Body
-json
-{
+  "trigger_text": "hello?",
+  "reply_text": "hi!",
   "is_active": false
 }
-
-### Response
-json
-{
-  "success": true,
-  "message": "Auto reply rule updated successfully",
-  "data": {
-"id": 1,
-"is_active": false
-  }
-}
+```
 
 ---
 
-## 6. Delete Auto Reply Rule
+### Toggle Rule
+`POST /api/v1/workspaces/{workspace_id}/channels/{channel_id}/auto-replies/{rule_id}/toggle`
 
-### Endpoint
-http
-DELETE /api/v1/workspaces/{workspace_id}/channels/{channel_id}/auto-replies/{rule_id}
+Body:
 
-### Response
-json
-{
-  "success": true,
-  "message": "Auto reply rule deleted successfully",
-  "data": null
-}
+```json
+{"is_active": false}
+```
 
 ---
 
-## 7. Get Auto Reply Logs
+### Delete Rule
+`DELETE /api/v1/workspaces/{workspace_id}/channels/{channel_id}/auto-replies/{rule_id}`
 
-### Endpoint
-http
-GET /api/v1/workspaces/{workspace_id}/channels/{channel_id}/auto-replies/logs?page=1&limit=20
+---
 
-### Response
-json
+### Rule Logs (MVP placeholder)
+`GET /api/v1/workspaces/{workspace_id}/channels/{channel_id}/auto-replies/logs`
+
+Response:
+
+```json
 {
-  "success": true,
-  "message": "OK",
-  "data": {
-"items": [
-{
-"id": 1,
-"rule_id": 1,
-"sender_rubika_user_id": "u0ABCD12345",
-"incoming_message": "قیمت چنده؟",
-"matched_keyword": "قیمت",
-"reply_text": "برای دریافت تعرفه، لطفاً به پیام پین‌شده مراجعه کنید.",
-"created_at": "2026-05-08T09:10:00Z"
+  "items": [],
+  "page": 1,
+  "limit": 20,
+  "total": 0
 }
-],
-"pagination": {
-"page": 1,
-"limit": 20,
-"total_items": 1,
-"total_pages": 1
-}
-  }
-}
+```

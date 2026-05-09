@@ -16,6 +16,7 @@ from app.models.workspace import Workspace, WorkspaceMember
 from app.repositories.base import BaseRepository
 from app.repositories.user_repository import UserRepository
 from app.services.auth_service import AuthService
+from app.services.auto_reply_service import AutoReplyService
 from app.services.channel_service import ChannelService
 from app.services.workspace_service import WorkspaceService
 
@@ -84,6 +85,12 @@ def get_channel_service(
     channel_repo: Annotated[BaseRepository[Channel], Depends(get_channel_repository)],
 ) -> ChannelService:
     return ChannelService(repository=channel_repo)
+
+
+def get_auto_reply_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> AutoReplyService:
+    return AutoReplyService(db_session=db)
 
 
 # ── Current User ──────────────────────────────────────────────────────
