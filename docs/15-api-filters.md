@@ -1,198 +1,60 @@
-# Filter API
+# Filter API (MVP)
 
-## 1. Create Filter Rule
+## Endpoints
 
-### Endpoint
-```http
-POST /api/v1/workspaces/{workspace_id}/channels/{channel_id}/filters
+### Create Filter
+`POST /api/v1/workspaces/{workspace_id}/channels/{channel_id}/filters`
 
-### Request Body
-json
+Body:
+
+```json
 {
-  "rule_type": "word",
-  "pattern": "تبلیغ",
-  "action_type": "delete_message",
+  "pattern": "spam",
+  "action": "delete",
+  "reason": "spam message",
   "is_active": true
 }
+```
 
-### Validation
-- `rule_type`: `link` or `word`
-- `pattern`: required
-- `action_type`: currently only `delete_message`
-
-### Response
-json
-{
-  "success": true,
-  "message": "Filter rule created successfully",
-  "data": {
-"id": 1,
-"rule_type": "word",
-"pattern": "تبلیغ",
-"action_type": "delete_message",
-"is_active": true
-  }
-}
+Supported actions: `delete`, `warn`, `ban`.
 
 ---
 
-## 2. List Filter Rules
+### List Filters
+`GET /api/v1/workspaces/{workspace_id}/channels/{channel_id}/filters?page=1&limit=20&is_active=true`
 
-### Endpoint
-http
-GET /api/v1/workspaces/{workspace_id}/channels/{channel_id}/filters?page=1&limit=20
-
-### Response
-json
+```json
 {
-  "success": true,
-  "message": "OK",
-  "data": {
-"items": [
-{
-"id": 1,
-"rule_type": "word",
-"pattern": "تبلیغ",
-"action_type": "delete_message",
-"is_active": true
+  "items": [],
+  "page": 1,
+  "limit": 20,
+  "total": 0
 }
-],
-"pagination": {
-"page": 1,
-"limit": 20,
-"total_items": 1,
-"total_pages": 1
-}
-  }
-}
+```
 
 ---
 
-## 3. Get Filter Rule Detail
-
-### Endpoint
-http
-GET /api/v1/workspaces/{workspace_id}/channels/{channel_id}/filters/{rule_id}
-
-### Response
-json
-{
-  "success": true,
-  "message": "OK",
-  "data": {
-"id": 1,
-"rule_type": "word",
-"pattern": "تبلیغ",
-"action_type": "delete_message",
-"is_active": true
-  }
-}
+### Get Filter
+`GET /api/v1/workspaces/{workspace_id}/channels/{channel_id}/filters/{rule_id}`
 
 ---
 
-## 4. Update Filter Rule
+### Update Filter
+`PATCH /api/v1/workspaces/{workspace_id}/channels/{channel_id}/filters/{rule_id}`
 
-### Endpoint
-http
-PATCH /api/v1/workspaces/{workspace_id}/channels/{channel_id}/filters/{rule_id}
-
-### Request Body
-json
+```json
 {
-  "pattern": "اسپم",
-  "is_active": true
-}
-
-### Response
-json
-{
-  "success": true,
-  "message": "Filter rule updated successfully",
-  "data": {
-"id": 1,
-"rule_type": "word",
-"pattern": "اسپم",
-"action_type": "delete_message",
-"is_active": true
-  }
-}
-
----
-
-## 5. Toggle Filter Rule
-
-### Endpoint
-http
-POST /api/v1/workspaces/{workspace_id}/channels/{channel_id}/filters/{rule_id}/toggle
-
-### Request Body
-json
-{
+  "pattern": "ads",
   "is_active": false
 }
-
-### Response
-json
-{
-  "success": true,
-  "message": "Filter rule updated successfully",
-  "data": {
-"id": 1,
-"is_active": false
-  }
-}
+```
 
 ---
 
-## 6. Delete Filter Rule
-
-### Endpoint
-http
-DELETE /api/v1/workspaces/{workspace_id}/channels/{channel_id}/filters/{rule_id}
-
-### Response
-json
-{
-  "success": true,
-  "message": "Filter rule deleted successfully",
-  "data": null
-}
+### Delete Filter
+`DELETE /api/v1/workspaces/{workspace_id}/channels/{channel_id}/filters/{rule_id}`
 
 ---
 
-## 7. Get Moderation Logs
-
-### Endpoint
-http
-GET /api/v1/workspaces/{workspace_id}/channels/{channel_id}/filters/logs?page=1&limit=20
-
-### Response
-json
-{
-  "success": true,
-  "message": "OK",
-  "data": {
-"items": [
-{
-"id": 1,
-"rule_id": 1,
-"sender_rubika_user_id": "u0ABCD12345",
-"message_text": "لینک تبلیغاتی",
-"detected_value": "تبلیغ",
-"action_type": "delete_message",
-"result_status": "success",
-"error_message": null,
-"created_at": "2026-05-08T11:00:00Z"
-}
-],
-"pagination": {
-"page": 1,
-"limit": 20,
-"total_items": 1,
-"total_pages": 1
-}
-  }
-}
-
-
----
+### Notes
+- Logs/matching pipeline is out of scope for this phase and will be completed in webhook/message processing phase.
