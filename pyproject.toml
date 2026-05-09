@@ -88,10 +88,6 @@ plugins = ["pydantic.mypy"]
 
 exclude = ["alembic/", ".venv/"]
 
-[[tool.mypy.overrides]]
-module = ["rq.*", "redis.*"]
-ignore_missing_imports = true
-
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = "-ra -q --strict-markers"
