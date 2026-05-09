@@ -374,7 +374,8 @@ Edit `.env` according to your local PostgreSQL and Redis setup.
 Start the development server:
 
 bash
-uv run uvicorn app.main:app --reload
+cp .env.example .env
+bash scripts/run_api.sh
 
 Application URL:
 
@@ -392,6 +393,14 @@ bash
 curl http://127.0.0.1:8000/api/v1/health
 
 Expected response format may vary by phase, but should be a successful JSON response.
+
+For production-style run:
+
+```bash
+uv run gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:8000
+```
+
+Deployment operations are documented in `docs/deployment.md`.
 
 ---
 
@@ -436,7 +445,7 @@ Database rules:
 
 ## Background Jobs
 
-Background jobs should be introduced only in the relevant implementation phase.
+Background jobs are in roadmap phase and currently have placeholder launchers.
 
 The expected stack is:
 
@@ -452,7 +461,13 @@ REDIS_URL="redis://localhost:6379/0"
 Example worker command, when implemented:
 
 bash
-uv run rq worker
+bash scripts/run_worker.sh
+
+Example scheduler command, when implemented:
+
+```bash
+bash scripts/run_scheduler.sh
+```
 
 Background job rules:
 

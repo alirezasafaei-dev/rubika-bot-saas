@@ -1,0 +1,16 @@
+[Unit]
+Description=Rubika Bot SaaS Scheduler
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/rubika-bot-saas
+EnvironmentFile=/opt/rubika-bot-saas/.env
+ExecStart=/usr/bin/env bash -lc 'cd /opt/rubika-bot-saas && bash scripts/run_scheduler.sh'
+Restart=always
+RestartSec=3
+User=www-data
+Group=www-data
+
+[Install]
+WantedBy=multi-user.target

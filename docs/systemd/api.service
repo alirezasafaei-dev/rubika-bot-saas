@@ -1,0 +1,16 @@
+[Unit]
+Description=Rubika Bot SaaS API
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/rubika-bot-saas
+EnvironmentFile=/opt/rubika-bot-saas/.env
+ExecStart=/usr/bin/env bash -lc 'cd /opt/rubika-bot-saas && uv run gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:8000'
+Restart=always
+RestartSec=3
+User=www-data
+Group=www-data
+
+[Install]
+WantedBy=multi-user.target
