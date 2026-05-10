@@ -7,6 +7,7 @@
   - `REDIS_URL`
 - اجرای مایگریشن دیتابیس:
   - `uv run alembic upgrade head`
+  - اگر محیطی از تاریخچه‌ی migration معیوب `7815ab12f360_add_scheduled_posts_table` برخورد، ابتدا دیتابیس را با مهاجرت تمیز (schema جدید) بازسازی کنید یا تصمیم عملیات رفع خطا را پیش از اجرای `upgrade` هماهنگ کنید.
 - مقداردهی secret ها در محیط اجرا:
   - `SECRET_KEY`/`JWT_SECRET_KEY`
   - `WEBHOOK_SECRET` (در صورت نیاز)

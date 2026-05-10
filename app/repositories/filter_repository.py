@@ -56,6 +56,14 @@ class FilterRepository:
         items = list((await self.db.execute(stmt)).scalars().all())
         return items, total
 
+    async def list_active_by_channel(self, *, channel_id: int) -> list[Filter]:
+        stmt = (
+            select(Filter)
+            .where(Filter.channel_id == channel_id, Filter.is_active)
+            .order_by(Filter.id.asc())
+        )
+        return list((await self.db.execute(stmt)).scalars().all())
+
     async def get_by_id_and_channel(
         self,
         *,

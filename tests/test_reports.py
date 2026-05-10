@@ -4,9 +4,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from app.models.auto_reply import AutoReply
-from app.models.filter import Filter, FilterAction
 from app.models.scheduled_post import PostStatus, ScheduledPost
+from app.models.webhook_processing import MessageProcessingLog, ProcessingOutcome
 
 pytestmark = pytest.mark.asyncio
 
@@ -43,8 +42,16 @@ async def test_workspace_summary(
                 scheduled_at=now,
                 created_at=now,
             ),
-            AutoReply(channel_id=channel.id, trigger_text="hello", reply_text="hi"),
-            Filter(channel_id=channel.id, pattern="spam", action=FilterAction.DELETE),
+            MessageProcessingLog(
+                channel_id=channel.id,
+                outcome=ProcessingOutcome.AUTO_REPLIED,
+                auto_reply_rule_id=None,
+            ),
+            MessageProcessingLog(
+                channel_id=channel.id,
+                outcome=ProcessingOutcome.FILTER_BLOCKED,
+                filter_rule_id=None,
+            ),
         ]
     )
     await db_session.commit()
@@ -93,8 +100,14 @@ async def test_channel_summary(
                 scheduled_at=now,
                 created_at=now,
             ),
-            AutoReply(channel_id=channel.id, trigger_text="hello", reply_text="hi"),
-            Filter(channel_id=channel.id, pattern="spam", action=FilterAction.DELETE),
+            MessageProcessingLog(
+                channel_id=channel.id,
+                outcome=ProcessingOutcome.AUTO_REPLIED,
+            ),
+            MessageProcessingLog(
+                channel_id=channel.id,
+                outcome=ProcessingOutcome.FILTER_BLOCKED,
+            ),
         ]
     )
     await db_session.commit()

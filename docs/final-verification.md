@@ -42,7 +42,9 @@ This project passed automated verification and is ready for local MVP validation
 ## Known Deferred Items (Phase 14 onward)
 
 - Worker and scheduler are implemented with a basic queue and periodic dispatch loop.
-- Auto-reply/filter hit metrics in reports are derived from configured rules while dedicated event logs are not yet implemented.
+- Webhook event ingest stores raw events in `webhook_events` and processing traces in
+  `message_processing_logs` so report metrics for auto replies/deleted messages now use
+  real processing traces.
 
 ## Status
 

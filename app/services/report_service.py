@@ -5,11 +5,13 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import and_, func, select
 
-from app.models.auto_reply import AutoReply
 from app.models.channel import Channel
-from app.models.filter import Filter
 from app.models.scheduled_post import PostStatus, ScheduledPost
+from app.models.webhook_processing import MessageProcessingLog, ProcessingOutcome
 from app.models.workspace import WorkspaceMember
+from app.repositories.message_processing_log_repository import (
+    MessageProcessingLogRepository,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +20,7 @@ if TYPE_CHECKING:
 class ReportService:
     def __init__(self, db_session: AsyncSession) -> None:
         self.db = db_session
+        self.log_repo = MessageProcessingLogRepository(db_session)
 
     async def _ensure_workspace_member(
         self, *, user_id: int, workspace_id: int
@@ -138,31 +141,24 @@ class ReportService:
             start_dt=start_dt,
             end_dt=end_dt,
         )
-        auto_reply_count = int(
+        channel_ids = list(
             (
                 await self.db.execute(
-                    select(func.count(AutoReply.id)).where(
-                        AutoReply.channel_id.in_(
-                            select(Channel.id).where(
-                                Channel.workspace_id == workspace_id
-                            )
-                        )
-                    )
+                    select(Channel.id).where(Channel.workspace_id == workspace_id)
                 )
-            ).scalar_one()
+            )
+            .scalars()
+            .all()
         )
-        filter_count = int(
-            (
-                await self.db.execute(
-                    select(func.count(Filter.id)).where(
-                        Filter.channel_id.in_(
-                            select(Channel.id).where(
-                                Channel.workspace_id == workspace_id
-                            )
-                        )
-                    )
-                )
-            ).scalar_one()
+        auto_reply_count = await self.log_repo.count_auto_replies_sent(
+            channel_ids=channel_ids,
+            since=start_dt,
+            until=end_dt,
+        )
+        filter_count = await self.log_repo.count_filtered_messages(
+            channel_ids=channel_ids,
+            since=start_dt,
+            until=end_dt,
         )
         return {
             "created_posts": total,
@@ -191,21 +187,15 @@ class ReportService:
             start_dt=start_dt,
             end_dt=end_dt,
         )
-        auto_reply_count = int(
-            (
-                await self.db.execute(
-                    select(func.count(AutoReply.id)).where(
-                        AutoReply.channel_id == channel_id
-                    )
-                )
-            ).scalar_one()
+        auto_reply_count = await self.log_repo.count_auto_replies_sent(
+            channel_ids=[channel_id],
+            since=start_dt,
+            until=end_dt,
         )
-        filter_count = int(
-            (
-                await self.db.execute(
-                    select(func.count(Filter.id)).where(Filter.channel_id == channel_id)
-                )
-            ).scalar_one()
+        filter_count = await self.log_repo.count_filtered_messages(
+            channel_ids=[channel_id],
+            since=start_dt,
+            until=end_dt,
         )
         return {
             "created_posts": total,
@@ -248,6 +238,30 @@ class ReportService:
             )
         ).all()
 
+        channel_ids = list(
+            (
+                await self.db.execute(
+                    select(Channel.id).where(Channel.workspace_id == workspace_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        logs = list(
+            (
+                await self.db.execute(
+                    select(
+                        MessageProcessingLog.created_at,
+                        MessageProcessingLog.outcome,
+                    ).where(
+                        MessageProcessingLog.channel_id.in_(channel_ids),
+                        MessageProcessingLog.created_at >= start_dt,
+                        MessageProcessingLog.created_at <= end_dt,
+                    )
+                )
+            ).all()
+        )
+
         buckets: dict[str, dict[str, int]] = {}
         for i in range(days):
             key = (start_dt + timedelta(days=i)).date().isoformat()
@@ -267,13 +281,22 @@ class ReportService:
             if status == PostStatus.FAILED:
                 buckets[key]["failed_posts"] += 1
 
+        for created_at, outcome in logs:
+            key = created_at.date().isoformat()
+            if key not in buckets:
+                continue
+            if outcome == ProcessingOutcome.AUTO_REPLIED:
+                buckets[key]["auto_replies_sent"] += 1
+            elif outcome == ProcessingOutcome.FILTER_BLOCKED:
+                buckets[key]["deleted_messages"] += 1
+
         return [
             {
                 "date": key,
                 "sent_posts": metrics["sent_posts"],
                 "failed_posts": metrics["failed_posts"],
-                "auto_replies_sent": 0,
-                "deleted_messages": 0,
+                "auto_replies_sent": metrics["auto_replies_sent"],
+                "deleted_messages": metrics["deleted_messages"],
             }
             for key, metrics in buckets.items()
         ]

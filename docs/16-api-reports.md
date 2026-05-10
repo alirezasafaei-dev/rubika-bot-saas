@@ -22,7 +22,8 @@
 }
 ```
 
-- `auto_replies_sent` and `deleted_messages` are MVP placeholders currently derived from configured auto-reply/filter rows.
+ - `auto_replies_sent` and `deleted_messages` are now calculated from `message_processing_logs`
+   (`auto_replied` and `filter_blocked` outcomes).
 
 ---
 

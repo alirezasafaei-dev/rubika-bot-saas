@@ -40,6 +40,14 @@ class Channel(Base):
     filters: Mapped[list["Filter"]] = relationship(
         "Filter", back_populates="channel", cascade="all, delete-orphan"
     )
+    webhook_events: Mapped[list["WebhookEvent"]] = relationship(
+        "WebhookEvent", back_populates="channel", cascade="all, delete-orphan"
+    )
+    message_processing_logs: Mapped[list["MessageProcessingLog"]] = relationship(
+        "MessageProcessingLog",
+        back_populates="channel",
+        cascade="all, delete-orphan",
+    )
 
 
 if TYPE_CHECKING:
@@ -47,3 +55,4 @@ if TYPE_CHECKING:
     from app.models.auto_reply import AutoReply
     from app.models.filter import Filter
     from app.models.scheduled_post import ScheduledPost
+    from app.models.webhook_processing import MessageProcessingLog, WebhookEvent

@@ -54,6 +54,14 @@ class AutoReplyRepository:
         items = list((await self.db.execute(stmt)).scalars().all())
         return items, total
 
+    async def list_active_by_channel(self, *, channel_id: int) -> list[AutoReply]:
+        stmt = (
+            select(AutoReply)
+            .where(AutoReply.channel_id == channel_id, AutoReply.is_active)
+            .order_by(AutoReply.id.asc())
+        )
+        return list((await self.db.execute(stmt)).scalars().all())
+
     async def get_by_id_and_channel(
         self,
         *,
