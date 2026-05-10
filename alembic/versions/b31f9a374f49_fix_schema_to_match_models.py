@@ -62,19 +62,42 @@ def upgrade() -> None:
     op.alter_column('workspace_members', 'created_at', new_column_name='joined_at')
     op.drop_column('workspace_members', 'updated_at')
 
-    # 7. Add refresh_tokens table
-    op.create_table('refresh_tokens',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('user_id', sa.Integer(), nullable=False),
-        sa.Column('token_hash', sa.String(64), nullable=False),
-        sa.Column('is_revoked', sa.Boolean(), server_default='false', nullable=False),
-        sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
-        sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index(op.f('ix_refresh_tokens_token_hash'), 'refresh_tokens', ['token_hash'], unique=True)
-    op.create_index(op.f('ix_refresh_tokens_user_id'), 'refresh_tokens', ['user_id'], unique=False)
+    # 7. Add refresh_tokens table (idempotent if previous migration already created it)
+    inspector = sa.inspect(op.get_bind())
+    if not inspector.has_table("refresh_tokens"):
+        op.create_table(
+            "refresh_tokens",
+            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("user_id", sa.Integer(), nullable=False),
+            sa.Column("token_hash", sa.String(64), nullable=False),
+            sa.Column(
+                "is_revoked",
+                sa.Boolean(),
+                server_default="false",
+                nullable=False,
+            ),
+            sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+            sa.Column(
+                "created_at",
+                sa.DateTime(timezone=True),
+                server_default=sa.text("now()"),
+                nullable=False,
+            ),
+            sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+            sa.PrimaryKeyConstraint("id"),
+        )
+        op.create_index(
+            op.f("ix_refresh_tokens_token_hash"),
+            "refresh_tokens",
+            ["token_hash"],
+            unique=True,
+        )
+        op.create_index(
+            op.f("ix_refresh_tokens_user_id"),
+            "refresh_tokens",
+            ["user_id"],
+            unique=False,
+        )
 
 
 def downgrade() -> None:

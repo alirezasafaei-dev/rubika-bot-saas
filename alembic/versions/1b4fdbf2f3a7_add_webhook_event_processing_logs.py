@@ -6,9 +6,9 @@ Create Date: 2026-05-10 14:25:28.000000+00:00
 """
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 revision = "1b4fdbf2f3a7"
 down_revision = "eac588709f37"
@@ -91,7 +91,7 @@ def upgrade() -> None:
             ["filter_rule_id"], ["filters.id"], ondelete="SET NULL"
         ),
         sa.ForeignKeyConstraint(
-            "auto_reply_rule_id",
+            ["auto_reply_rule_id"],
             ["auto_replies.id"],
             ondelete="SET NULL",
         ),

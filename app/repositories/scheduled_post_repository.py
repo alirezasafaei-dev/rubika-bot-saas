@@ -70,10 +70,13 @@ class ScheduledPostRepository:
         ):
             now = now.replace(tzinfo=None)
 
+        pending_value = "pending"
+        queued_value = "queued"
+
         ids_stmt = (
             select(ScheduledPost.id)
             .where(
-                ScheduledPost.status == PostStatus.PENDING,
+                ScheduledPost.status == pending_value,
                 ScheduledPost.scheduled_at <= now,
             )
             .order_by(ScheduledPost.scheduled_at.asc(), ScheduledPost.id.asc())
@@ -89,12 +92,12 @@ class ScheduledPostRepository:
         claimed_ids = list(
             (
                 await self.db.execute(
-                    update(ScheduledPost)
+                update(ScheduledPost)
                     .where(
                         ScheduledPost.id.in_(post_ids),
-                        ScheduledPost.status == PostStatus.PENDING,
+                        ScheduledPost.status == pending_value,
                     )
-                    .values(status=PostStatus.QUEUED)
+                    .values(status=queued_value)
                     .returning(ScheduledPost.id)
                 )
             )
@@ -109,7 +112,7 @@ class ScheduledPostRepository:
             select(ScheduledPost)
             .where(
                 ScheduledPost.id.in_(claimed_ids),
-                ScheduledPost.status == PostStatus.QUEUED,
+                ScheduledPost.status == queued_value,
             )
             .order_by(ScheduledPost.scheduled_at.asc(), ScheduledPost.id.asc())
         )

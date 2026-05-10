@@ -7,7 +7,9 @@ from datetime import UTC, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import AsyncSessionLocal
+from app.integrations import send_text_message
 from app.models.scheduled_post import PostStatus
+from app.repositories.channel_repository import ChannelRepository
 from app.repositories.scheduled_post_repository import ScheduledPostRepository
 
 logger = logging.getLogger(__name__)
@@ -16,6 +18,7 @@ logger = logging.getLogger(__name__)
 async def send_scheduled_post(post_id: int) -> bool:
     async with _session_factory() as db:
         repo = ScheduledPostRepository(db)
+        channel_repo = ChannelRepository(db)
         post = await repo.get_by_id(post_id=post_id)
         if post is None:
             logger.warning("Scheduled post %s not found", post_id)
@@ -33,8 +36,14 @@ async def send_scheduled_post(post_id: int) -> bool:
             return False
 
         try:
-            # Placeholder send action for MVP:
-            # Replace this with real Rubika API call in production.
+            channel = await channel_repo.get_by_id(post.channel_id)
+            if channel is None:
+                raise RuntimeError(f"Channel {post.channel_id} not found")
+
+            result = await send_text_message(channel.rubika_channel_id, post.content)
+            if not result.ok:
+                raise RuntimeError(result.error or "rubika send failed")
+
             await repo.mark_sent(post_id=post_id, sent_at=now)
             await db.commit()
             logger.info("Scheduled post %s marked sent", post_id)
