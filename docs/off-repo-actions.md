@@ -8,6 +8,8 @@
 - اجرای مایگریشن دیتابیس:
   - `uv run alembic upgrade head`
   - اگر محیطی از تاریخچه‌ی migration معیوب `7815ab12f360_add_scheduled_posts_table` برخورد، ابتدا دیتابیس را با مهاجرت تمیز (schema جدید) بازسازی کنید یا تصمیم عملیات رفع خطا را پیش از اجرای `upgrade` هماهنگ کنید.
+  - برای محلی‌سازی خودکار تست و اصلاح SQLite: `bash scripts/ensure_migrations.sh`
+  - برای بازسازی خودکار SQLite معیوب در محیط local: `AUTO_REPAIR_SQLITE=1 bash scripts/ensure_migrations.sh`
 - مقداردهی secret ها در محیط اجرا:
   - `SECRET_KEY`/`JWT_SECRET_KEY`
   - `WEBHOOK_SECRET` (در صورت نیاز)

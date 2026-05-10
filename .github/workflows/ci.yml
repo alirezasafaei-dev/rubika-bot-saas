@@ -63,7 +63,7 @@ jobs:
         run: uv sync --all-extras
 
       - name: Run migrations
-        run: uv run alembic upgrade head
+        run: AUTO_REPAIR_SQLITE=1 uv run bash scripts/ensure_migrations.sh
 
       - name: Run tests with coverage
         run: |

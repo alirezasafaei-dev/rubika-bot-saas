@@ -57,6 +57,15 @@ API:
 ```bash
 uv run alembic upgrade head
 ```
+or
+
+```bash
+bash scripts/ensure_migrations.sh
+```
+For local SQLite recovery from legacy migration syntax, set:
+```bash
+AUTO_REPAIR_SQLITE=1 DATABASE_URL='sqlite+aiosqlite:///./dev.db' bash scripts/ensure_migrations.sh
+```
 
 Use a controlled backup strategy for PostgreSQL before upgrades.
 
