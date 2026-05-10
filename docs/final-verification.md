@@ -32,15 +32,16 @@ This project passed automated verification and is ready for local MVP validation
 
 - Local run docs and scripts exist:
   - `scripts/run_api.sh`
-  - `scripts/run_worker.sh` (placeholder, pending worker bootstrap)
-  - `scripts/run_scheduler.sh` (placeholder, pending scheduler bootstrap)
+- `scripts/run_api.sh` starts the API service via `uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`.
+- `scripts/run_worker.sh` starts the RQ worker for scheduled posts queue.
+- `scripts/run_scheduler.sh` starts the periodic due-post dispatcher.
 - Deployment docs:
   - `docs/deployment.md`
   - `docs/systemd/*.service`
 
 ## Known Deferred Items (Phase 14 onward)
 
-- Worker and scheduler implementations are not yet fully wired to request queue/job execution.
+- Worker and scheduler are implemented with a basic queue and periodic dispatch loop.
 - Auto-reply/filter hit metrics in reports are derived from configured rules while dedicated event logs are not yet implemented.
 
 ## Status

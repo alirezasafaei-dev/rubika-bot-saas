@@ -12,7 +12,7 @@
   - `WEBHOOK_SECRET` (در صورت نیاز)
 - راه‌اندازی سرویس API:
   - `uv run uvicorn app.main:app --host 0.0.0.0 --port 8000`
-- اجرای worker و scheduler (درصورت وجود worker/job واقعی)
+- اجرای worker و scheduler
 - تنظیم reverse proxy (Nginx/Traefik) و TLS
 - تنظیم backup برای دیتابیس PostgreSQL
 - افزودن دامنه/سی‌دی‌ان و deployment manifest نهایی در محیط شما

@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class ScheduledPostStatus(StrEnum):
     PENDING = "pending"
+    QUEUED = "queued"
     SENT = "sent"
     FAILED = "failed"
     CANCELLED = "cancelled"

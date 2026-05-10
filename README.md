@@ -445,7 +445,7 @@ Database rules:
 
 ## Background Jobs
 
-Background jobs are in roadmap phase and currently have placeholder launchers.
+Background jobs are implemented for MVP with dedicated worker + scheduler processes.
 
 The expected stack is:
 
@@ -458,12 +458,12 @@ Example Redis URL:
 env
 REDIS_URL="redis://localhost:6379/0"
 
-Example worker command, when implemented:
+Example worker command:
 
 bash
 bash scripts/run_worker.sh
 
-Example scheduler command, when implemented:
+Example scheduler command:
 
 ```bash
 bash scripts/run_scheduler.sh

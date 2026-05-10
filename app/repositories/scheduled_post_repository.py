@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 
 from sqlalchemy import func, select, update
@@ -52,6 +53,77 @@ class ScheduledPostRepository:
         items = list((await self.db.execute(stmt)).scalars().all())
         return items, total
 
+    async def claim_due_posts(
+        self,
+        *,
+        now: datetime,
+        limit: int = 100,
+    ) -> Sequence[ScheduledPost]:
+        """Claim due posts and move them to queued state atomically.
+
+        This keeps duplicate dispatching low across scheduler runs.
+        """
+        if (
+            self.db.bind
+            and self.db.bind.dialect.name == "sqlite"
+            and now.tzinfo is not None
+        ):
+            now = now.replace(tzinfo=None)
+
+        ids_stmt = (
+            select(ScheduledPost.id)
+            .where(
+                ScheduledPost.status == PostStatus.PENDING,
+                ScheduledPost.scheduled_at <= now,
+            )
+            .order_by(ScheduledPost.scheduled_at.asc(), ScheduledPost.id.asc())
+            .limit(limit)
+        )
+        if self.db.bind and getattr(self.db.bind, "name", "").startswith("postgresql"):
+            ids_stmt = ids_stmt.with_for_update(skip_locked=True)
+
+        post_ids = list((await self.db.execute(ids_stmt)).scalars().all())
+        if not post_ids:
+            return []
+
+        claimed_ids = list(
+            (
+                await self.db.execute(
+                    update(ScheduledPost)
+                    .where(
+                        ScheduledPost.id.in_(post_ids),
+                        ScheduledPost.status == PostStatus.PENDING,
+                    )
+                    .values(status=PostStatus.QUEUED)
+                    .returning(ScheduledPost.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        if not claimed_ids:
+            return []
+
+        items_stmt = (
+            select(ScheduledPost)
+            .where(
+                ScheduledPost.id.in_(claimed_ids),
+                ScheduledPost.status == PostStatus.QUEUED,
+            )
+            .order_by(ScheduledPost.scheduled_at.asc(), ScheduledPost.id.asc())
+        )
+        return list((await self.db.execute(items_stmt)).scalars().all())
+
+    async def mark_queued(self, *, post_id: int) -> bool:
+        post = await self.get_by_id(post_id=post_id)
+        if post is None or post.status != PostStatus.PENDING:
+            return False
+
+        post.status = PostStatus.QUEUED
+        await self.db.flush()
+        return True
+
     async def get_by_id_and_channel(
         self,
         *,
@@ -62,6 +134,14 @@ class ScheduledPostRepository:
             ScheduledPost.id == post_id,
             ScheduledPost.channel_id == channel_id,
         )
+        return (await self.db.execute(stmt)).scalar_one_or_none()
+
+    async def get_by_id(
+        self,
+        *,
+        post_id: int,
+    ) -> ScheduledPost | None:
+        stmt = select(ScheduledPost).where(ScheduledPost.id == post_id)
         return (await self.db.execute(stmt)).scalar_one_or_none()
 
     async def update_pending_post(

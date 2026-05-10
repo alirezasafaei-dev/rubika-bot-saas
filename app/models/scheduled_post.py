@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 class PostStatus(enum.StrEnum):
     PENDING = "pending"
+    QUEUED = "queued"
     SENT = "sent"
     FAILED = "failed"
     CANCELLED = "cancelled"

@@ -16,5 +16,5 @@
 
 ## Notes
 
-- Worker and scheduler scripts exist with placeholder guards because background execution pipeline is not yet fully implemented.
+- Worker and scheduler scripts are now implemented (RQ runner + scheduler loop), with enqueue/claim flow wired end-to-end.
 - Report metric fields for `auto_replies_sent` and `deleted_messages` are MVP placeholders until event/log tables are added.

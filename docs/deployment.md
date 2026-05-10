@@ -41,8 +41,9 @@ API:
 ## Services
 
 - `scripts/run_api.sh` starts the API server
-- `scripts/run_worker.sh` starts the worker process (when implemented)
-- `scripts/run_scheduler.sh` starts the scheduler process (when implemented)
+- `scripts/run_worker.sh` starts the worker process (`scheduled_posts` queue).
+- `scripts/run_scheduler.sh` starts the periodic scheduler process.
+- worker uses queue: `scheduled_posts` in Redis
 
 ## Production example (systemd)
 
