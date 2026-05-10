@@ -32,7 +32,13 @@ class ScheduledPost(Base):
         DateTime(timezone=True), nullable=False, index=True
     )
     status: Mapped[PostStatus] = mapped_column(
-        SQLEnum(PostStatus, name="post_status"),
+        SQLEnum(
+            PostStatus,
+            name="post_status_enum",
+            values_callable=lambda members: [m.value for m in members],
+            native_enum=True,
+            create_constraint=False,
+        ),
         default=PostStatus.PENDING,
         nullable=False,
         index=True,

@@ -23,6 +23,9 @@ Optional:
 
 - `TEST_DATABASE_URL` (local tests)
 - `WEBHOOK_SECRET` (for webhook validation)
+- `RUBIKA_BOT_TOKEN` (for scheduled posts sending)
+- `RUBIKA_SEND_ENDPOINT` (default: `https://botapi.rubika.ir/v3/{TOKEN}/{METHOD}`)
+- `RUBIKA_SEND_METHOD` (default: `sendMessage`)
 
 ## Local Run (development)
 
@@ -51,6 +54,13 @@ API:
   `uv run gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:8000`
 
 - Run API, worker, scheduler as separate units from `docs/systemd/*.service`.
+
+## Reverse proxy (nginx) on VPS
+
+- Server block added for:
+  - `rbsaas.alirezasafaeisystems.ir` on port `80` -> `127.0.0.1:8000`.
+- Quick proxy smoke test:
+  - `curl -H "Host: rbsaas.alirezasafaeisystems.ir" http://127.0.0.1/api/v1/health`
 
 ## Database and migrations
 

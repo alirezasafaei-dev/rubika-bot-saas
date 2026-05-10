@@ -17,7 +17,7 @@ depends_on = None
 def upgrade() -> None:
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
-        op.execute("ALTER TYPE post_status ADD VALUE IF NOT EXISTS 'queued'")
+        op.execute("ALTER TYPE post_status_enum ADD VALUE IF NOT EXISTS 'queued'")
 
     # SQLite and other local test backends do not enforce enum constraints.
 
