@@ -38,6 +38,8 @@ This project passed automated verification and is ready for local MVP validation
 - Deployment docs:
   - `docs/deployment.md`
   - `docs/systemd/*.service`
+- Migration safety:
+  - `scripts/ensure_migrations.sh` validates migration head and handles legacy SQLite migration incompatibilities via `AUTO_REPAIR_SQLITE=1`.
 
 ## Known Deferred Items (Phase 14 onward)
 

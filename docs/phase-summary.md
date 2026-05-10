@@ -8,6 +8,7 @@
 - Phase 13 — API Hardening: centralized error handling + tests
 - Phase 14 — Deployment/Operations Docs: scripts and systemd examples + `.env` + README updates
 - Phase 15 — Final Verification: verification checklist document + validation report
+- Phase 16 — Migration Robustness: local SQLite recovery automation + CI migration bootstrapping fallback
 
 ## Commands executed
 

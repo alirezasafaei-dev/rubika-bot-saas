@@ -26,26 +26,29 @@ bootstrap_sqlite_from_models() {
   local db_url=$1
   local db_file
   db_file="$(extract_sqlite_file "$db_url")"
+  local db_file_abs
+  db_file_abs="$(realpath -m "$REPO_ROOT/$db_file")"
 
   if [[ "$db_file" == ":memory:" ]]; then
     echo "AUTO_REPAIR_SQLITE is not supported for in-memory SQLite URLs." >&2
     return 1
   fi
 
-  rm -f "$db_file"
+  rm -f "$db_file_abs"
 
-  cat <<'PY' > "$TMP_BOOTSTRAP_SCRIPT"
+cat <<'PY' > "$TMP_BOOTSTRAP_SCRIPT"
 from sqlalchemy import create_engine
 from app.db.base_class import Base
 from app.models import *  # noqa: F401,F403
 import os
+from pathlib import Path
 
-db_url = os.environ["DATABASE_URL"]
-sync_url = db_url.replace("+aiosqlite", "")
+db_file = Path(os.environ["SQLITE_FILE"]).resolve()
+sync_url = f"sqlite:///{db_file}"
 engine = create_engine(sync_url, future=True)
 Base.metadata.create_all(engine)
 PY
-  DATABASE_URL="$db_url" uv run python "$TMP_BOOTSTRAP_SCRIPT"
+  SQLITE_FILE="$db_file_abs" uv run python "$TMP_BOOTSTRAP_SCRIPT"
 }
 
 echo "Checking migrations against: $DATABASE_URL"
@@ -66,17 +69,24 @@ if [[ "$STATUS" -eq 0 ]]; then
 fi
 
 if [[ "$DATABASE_URL" == sqlite* ]] && [[ "${DATABASE_URL}" == *"+aiosqlite://"* ]]; then
-  if [[ "${AUTO_REPAIR_SQLITE:-0}" == "1" ]]; then
-    bootstrap_sqlite_from_models "$DATABASE_URL"
-    uv run alembic stamp head
+  if grep -qE "near \"ALTER\": syntax error|duplicate column name: hashed_password|ALTER TABLE users ALTER COLUMN" "$LOG_FILE"; then
+    if [[ "${AUTO_REPAIR_SQLITE:-0}" == "1" ]]; then
+      bootstrap_sqlite_from_models "$DATABASE_URL"
+      uv run alembic stamp head
+      rm -f "$LOG_FILE"
+      echo "SQLite failure handled by rebuilding from current SQLAlchemy models and stamping head."
+      exit 0
+    fi
+
+    echo "Known SQLite migration compatibility issue detected." >&2
+    echo "Set AUTO_REPAIR_SQLITE=1 to allow local rebuild from current models."
     rm -f "$LOG_FILE"
-    echo "SQLite failure handled by rebuilding from current SQLAlchemy models and stamping head."
-    exit 0
+    exit 1
   fi
 
-  if grep -q "ALTER TABLE users ALTER COLUMN" "$LOG_FILE"; then
-    echo "Known SQLite migration incompatibility detected: ALTER TABLE users ALTER COLUMN." >&2
-    echo "Set AUTO_REPAIR_SQLITE=1 to allow local rebuild from current models."
+  if [[ "${AUTO_REPAIR_SQLITE:-0}" == "1" ]]; then
+    echo "AUTO_REPAIR_SQLITE is enabled, but no known auto-repair pattern matched this SQLite failure." >&2
+    echo "Please inspect the log and avoid automatic model bootstrap for unknown migration errors." >&2
     rm -f "$LOG_FILE"
     exit 1
   fi
