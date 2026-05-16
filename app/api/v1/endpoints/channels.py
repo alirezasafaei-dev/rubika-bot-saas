@@ -9,7 +9,10 @@ from app.models.user import User
 from app.schemas.channel import ChannelCreate, ChannelResponse, ChannelUpdate
 from app.services.channel_service import ChannelService
 
-router = APIRouter(prefix="/channels", tags=["channels"])
+router = APIRouter(
+    prefix="/workspaces/{workspace_id}/channels",
+    tags=["channels"],
+)
 
 
 @router.post(

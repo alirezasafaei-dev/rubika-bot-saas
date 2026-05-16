@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import enum
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -11,6 +12,12 @@ from app.db.base import Base
 if TYPE_CHECKING:
     from app.models.channel import Channel
     from app.models.user import User
+
+
+class WorkspaceRole(enum.StrEnum):
+    OWNER = "owner"
+    ADMIN = "admin"
+    MEMBER = "member"
 
 
 class Workspace(Base):
@@ -62,7 +69,15 @@ class WorkspaceMember(Base):
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=False
     )
-    role: Mapped[str] = mapped_column(String(50), nullable=False, default="member")
+    role: Mapped[WorkspaceRole] = mapped_column(
+        Enum(
+            WorkspaceRole,
+            name="workspace_role_enum",
+            values_callable=lambda item: [value.value for value in item],
+        ),
+        nullable=False,
+        default=WorkspaceRole.MEMBER,
+    )
     joined_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

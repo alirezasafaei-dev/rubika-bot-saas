@@ -40,12 +40,20 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String(150), nullable=False)
 
     role: Mapped[UserRole] = mapped_column(
-        Enum(UserRole, name="user_role"),
+        Enum(
+            UserRole,
+            name="user_role",
+            values_callable=lambda obj: [item.value for item in obj],
+        ),
         default=UserRole.MEMBER,
         nullable=False,
     )
     status: Mapped[UserStatus] = mapped_column(
-        Enum(UserStatus, name="user_status"),
+        Enum(
+            UserStatus,
+            name="user_status",
+            values_callable=lambda obj: [item.value for item in obj],
+        ),
         default=UserStatus.ACTIVE,
         nullable=False,
     )
