@@ -33,6 +33,15 @@ class WebhookService:
             )
         return channel
 
+    async def _require_channel_by_rubika_id(self, rubika_channel_id: str):
+        channel = await self.channel_repo.get_by_rubika_channel_id(rubika_channel_id)
+        if channel is None:
+            raise NotFoundError(
+                error_code=ErrorCode.CHANNEL_NOT_FOUND,
+                message="Channel not found",
+            )
+        return channel
+
     def _validate_secret(self, payload_secret: str | None) -> None:
         expected_secret = settings.webhook_secret
         if not expected_secret:
@@ -167,6 +176,16 @@ class WebhookService:
         await self.db.commit()
         return {"accepted": True, "reason": "message_processed"}
 
+    async def process_message_event_from_rubika_channel(
+        self, *, rubika_channel_id: str, secret: str | None, payload: dict
+    ) -> dict:
+        channel = await self._require_channel_by_rubika_id(rubika_channel_id)
+        return await self.process_message_event(
+            channel_id=channel.id,
+            secret=secret,
+            payload=payload,
+        )
+
     async def process_delivery_event(
         self, *, channel_id: int, secret: str | None, payload: dict
     ) -> dict:
@@ -195,3 +214,13 @@ class WebhookService:
             "event": "delivery_result",
             "processed_at": now.isoformat(),
         }
+
+    async def process_delivery_event_from_rubika_channel(
+        self, *, rubika_channel_id: str, secret: str | None, payload: dict
+    ) -> dict:
+        channel = await self._require_channel_by_rubika_id(rubika_channel_id)
+        return await self.process_delivery_event(
+            channel_id=channel.id,
+            secret=secret,
+            payload=payload,
+        )

@@ -21,3 +21,15 @@ class RubikaWebhookResponse(BaseModel):
 
     accepted: bool
     reason: str
+
+
+class RubikaWebhookAdapterPayload(BaseModel):
+    """Raw Rubika webhook payload (or canonical format)."""
+
+    model_config = ConfigDict(extra="allow")
+
+    event_type: str | None = Field(default=None)
+    message: str | None = Field(default=None, max_length=2000)
+    sender_rubika_user_id: str | None = Field(default=None, max_length=64)
+    message_id: str | None = Field(default=None, max_length=128)
+    rubika_channel_id: str | None = Field(default=None, max_length=255)

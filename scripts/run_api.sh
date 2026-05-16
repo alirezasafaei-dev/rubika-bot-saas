@@ -3,6 +3,10 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
+UV_BIN="uv"
+if ! command -v uv >/dev/null 2>&1 && [ -x "${REPO_ROOT}/.venv/bin/uv" ]; then
+  UV_BIN="${REPO_ROOT}/.venv/bin/uv"
+fi
 
 if [[ -z "${DATABASE_URL:-}" ]]; then
   echo "DATABASE_URL is not set; loading .env if present."
@@ -13,4 +17,4 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
 fi
 
 echo "Starting FastAPI app at 0.0.0.0:8000"
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+${UV_BIN} run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

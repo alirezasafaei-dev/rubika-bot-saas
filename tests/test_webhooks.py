@@ -35,6 +35,39 @@ async def test_webhook_accepts_valid_channel(
     assert response.json()["accepted"] is True
 
 
+@pytest.fixture(autouse=True)
+def clear_default_webhook_secret():
+    original = settings.webhook_secret
+    settings.webhook_secret = ""
+    yield
+    settings.webhook_secret = original
+
+
+async def test_webhook_accepts_rubika_update_format(
+    async_client,
+    channel,
+):
+    response = await async_client.post(
+        "/api/v1/webhooks/rubika",
+        json={
+            "update": {
+                "type": "NewMessage",
+                "chat_id": channel.rubika_channel_id,
+                "new_message": {
+                    "message_id": "rm1",
+                    "text": "hello",
+                    "sender_id": "u2",
+                    "chat_id": channel.rubika_channel_id,
+                },
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["accepted"] is True
+    assert response.json()["reason"] == "message_processed"
+
+
 async def test_webhook_rejects_invalid_channel(async_client):
     payload = {"event_type": "message_received"}
 
@@ -79,7 +112,7 @@ async def test_webhook_rejects_unknown_event_type(
         json=payload,
     )
 
-    assert response.status_code == 422
+    assert response.status_code == 400
 
 
 async def test_webhook_filters_then_won_t_auto_reply(

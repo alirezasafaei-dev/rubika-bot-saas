@@ -11,3 +11,8 @@ class ChannelRepository(BaseRepository[Channel]):
 
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(Channel, session)
+
+    async def get_by_rubika_channel_id(
+        self, rubika_channel_id: str
+    ) -> Channel | None:
+        return await self.get_one_by(rubika_channel_id=rubika_channel_id)

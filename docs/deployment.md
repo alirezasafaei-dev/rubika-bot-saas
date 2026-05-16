@@ -55,6 +55,23 @@ API:
 
 - Run API, worker, scheduler as separate units from `docs/systemd/*.service`.
 
+### Rubika webhook registration (production)
+
+- Register webhook endpoint with Rubika using `updateBotEndpoints`:
+  - `url`: `https://rbsaas.alirezasafaeisystems.ir/api/v1/webhooks/rubika`
+  - `type`: `ReceiveUpdate`
+  - `secret`: optional, from `WEBHOOK_SECRET`
+
+```bash
+cd /home/deploy/rubika-bot-saas
+export DOMAIN_FOR_RUBIKABOTSAAS=https://rbsaas.alirezasafaeisystems.ir/
+export WEBHOOK_SECRET=... # optional
+bash scripts/configure_rubika_webhook.sh
+```
+
+Expected success response:
+`{\"status\":\"OK\",\"data\":{\"status\":\"Done\"}}` or equivalent positive status.
+
 ## Reverse proxy (nginx) on VPS
 
 - Server block added for:
