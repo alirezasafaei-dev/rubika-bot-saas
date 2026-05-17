@@ -102,6 +102,15 @@ Use a controlled backup strategy for PostgreSQL before upgrades.
 - keep secrets in a dedicated secret store
 - rotate deployment secrets periodically
 
+## Out-of-repo tasks (operator checklist)
+
+- After deployment, do the Rubika-side tasks in:
+  - `docs/rubika-external-operations.md`
+- Quick confirm on Rubika-side before announcing production:
+  - Bot token is valid and stored in env only (not in repo)
+  - Webhook registered and accepted (`status: Done`)
+  - Bot is member/admin where scheduling needs to send messages
+
 ## Production maintenance runbook
 
 - Keep a short daily maintenance log in this repo:
