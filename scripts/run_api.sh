@@ -16,5 +16,10 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
   set +a
 fi
 
+UVICORN_ARGS=(app.main:app --host 0.0.0.0 --port 8000)
+if [[ "${ENVIRONMENT:-development}" == "development" || "${DEBUG:-false}" == "true" ]]; then
+  UVICORN_ARGS+=(--reload)
+fi
+
 echo "Starting FastAPI app at 0.0.0.0:8000"
-${UV_BIN} run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+${UV_BIN} run uvicorn "${UVICORN_ARGS[@]}"
