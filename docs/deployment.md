@@ -101,3 +101,17 @@ Use a controlled backup strategy for PostgreSQL before upgrades.
 - snapshot or dump database: `pg_dump -Fc rubika_bot`
 - keep secrets in a dedicated secret store
 - rotate deployment secrets periodically
+
+## Production maintenance runbook
+
+- Keep a short daily maintenance log in this repo:
+  - `docs/production-maintenance-log.md`
+- Run these commands for quick operational verification:
+  - `curl -H "Host: rbsaas.alirezasafaeisystems.ir" https://rbsaas.alirezasafaeisystems.ir/api/v1/health`
+  - `systemctl is-active rubika-api.service rubika-worker.service rubika-scheduler.service`
+  - `cd /home/deploy/rubika-bot-saas && source .venv/bin/activate && alembic current`
+- Optional log storage cleanup (server side):
+  - `sudo journalctl --vacuum-size=1G`
+- Check storage usage:
+  - `df -h / /home`
+  - `du -h /home/deploy/rubika-bot-saas | sort -rh | head -n 20`
