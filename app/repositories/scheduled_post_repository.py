@@ -92,7 +92,7 @@ class ScheduledPostRepository:
         claimed_ids = list(
             (
                 await self.db.execute(
-                update(ScheduledPost)
+                    update(ScheduledPost)
                     .where(
                         ScheduledPost.id.in_(post_ids),
                         ScheduledPost.status == pending_value,

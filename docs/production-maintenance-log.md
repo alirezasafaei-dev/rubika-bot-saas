@@ -48,4 +48,3 @@ Date: 2026-05-17
 - Optional periodic cleanup:
   - `sudo journalctl --vacuum-time=30d` (or size-based vacuum)
   - remove orphaned venv caches only if explicitly needed and after backup
-

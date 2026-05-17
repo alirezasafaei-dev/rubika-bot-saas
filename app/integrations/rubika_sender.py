@@ -32,7 +32,11 @@ def _build_send_url(token: str, method: str) -> str:
     if prepared.endswith("/"):
         prepared = prepared.rstrip("/")
 
-    if not prepared.endswith(f"/{method}") and "{METHOD}" not in endpoint and "{method}" not in endpoint:
+    if (
+        not prepared.endswith(f"/{method}")
+        and "{METHOD}" not in endpoint
+        and "{method}" not in endpoint
+    ):
         prepared = f"{prepared}/{method}"
 
     return prepared
@@ -48,7 +52,9 @@ async def send_text_message(channel_id: str, text: str) -> SendResult:
 
     url = _build_send_url(token=token, method=method)
     if not url:
-        logger.info("Rubika send disabled (no endpoint or token). message=%s", text[:80])
+        logger.info(
+            "Rubika send disabled (no endpoint or token). message=%s", text[:80]
+        )
         return SendResult(ok=True)
 
     payload = {
