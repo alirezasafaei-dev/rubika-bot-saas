@@ -28,7 +28,11 @@ if [[ -n "${CHANNEL_ID}" ]]; then
 else
   WEBHOOK_PATH="/api/v1/webhooks/rubika"
 fi
-WEBHOOK_URL="${BASE_DOMAIN%/}${WEBHOOK_PATH}"
+if [[ "${BASE_DOMAIN}" =~ ^https?:// ]]; then
+  WEBHOOK_URL="${BASE_DOMAIN%/}${WEBHOOK_PATH}"
+else
+  WEBHOOK_URL="https://${BASE_DOMAIN%/}${WEBHOOK_PATH}"
+fi
 
 if [[ -n "${WEBHOOK_SECRET:-}" ]]; then
   SECRET="${WEBHOOK_SECRET}"
