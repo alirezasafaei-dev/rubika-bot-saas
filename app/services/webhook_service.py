@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 from app.core.config import settings
 from app.core.errors import ErrorCode, NotFoundError, UnauthorizedError
+from app.integrations import send_text_message
 from app.models.filter import Filter, FilterAction
 from app.models.webhook_processing import ProcessingOutcome
 from app.repositories.auto_reply_repository import AutoReplyRepository
@@ -69,6 +70,25 @@ class WebhookService:
                 return item
         return None
 
+    @staticmethod
+    def _command_reply(message: str) -> str | None:
+        normalized = message.strip().lower()
+        if normalized.startswith("/start"):
+            return (
+                "سلام 👋\n"
+                "من ربات روبیکا هستم.\n"
+                "دستورات:\n"
+                "• /help\n"
+                "• ارسال پیام برای پاسخ خودکار\n"
+            )
+        if normalized.startswith("/help"):
+            return (
+                "راهنما:\n"
+                "• پیام بفرست تا پاسخ خودکار بگیری.\n"
+                "• برای ارسال زمان‌بندی‌شده از پنل استفاده کن.\n"
+            )
+        return None
+
     async def _record_message_outcome(
         self,
         *,
@@ -89,6 +109,17 @@ class WebhookService:
             message_excerpt=self._excerpt(payload.get("message")),
             reason=reason,
         )
+
+    async def _send_bot_reply(
+        self,
+        *,
+        channel_id: int,
+        rubika_channel_id: str,
+        text: str,
+    ) -> None:
+        result = await send_text_message(rubika_channel_id, text)
+        if not result.ok:
+            raise RuntimeError(result.error or f"failed to send reply for {channel_id}")
 
     async def process_message_event(
         self, *, channel_id: int, secret: str | None, payload: dict
@@ -148,10 +179,34 @@ class WebhookService:
         auto_replies = await self.auto_reply_repo.list_active_by_channel(
             channel_id=channel_id
         )
+        command_reply = self._command_reply(normalized_message)
+        if command_reply is not None:
+            await self._send_bot_reply(
+                channel_id=channel_id,
+                rubika_channel_id=(await self._require_channel(channel_id)).rubika_channel_id,
+                text=command_reply,
+            )
+            await self._record_message_outcome(
+                event_id=event.id,
+                channel_id=channel_id,
+                outcome=ProcessingOutcome.AUTO_REPLIED,
+                payload=payload,
+                reason="command_reply",
+            )
+            await self.db.commit()
+            return {
+                "accepted": True,
+                "reason": "command_reply",
+            }
         for reply in auto_replies:
             if not reply.trigger_text:
                 continue
             if reply.trigger_text.lower() in normalized_message:
+                await self._send_bot_reply(
+                    channel_id=channel_id,
+                    rubika_channel_id=(await self._require_channel(channel_id)).rubika_channel_id,
+                    text=reply.reply_text,
+                )
                 await self._record_message_outcome(
                     event_id=event.id,
                     channel_id=channel_id,
