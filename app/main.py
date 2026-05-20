@@ -1,14 +1,27 @@
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException, Request
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 
+from app.api.v1.endpoints.webhooks import (
+    _normalize_rubika_payload,
+    _validate_channel_id,
+    _validate_event_type,
+    get_webhook_service,
+)
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.errors import AppException, ErrorCode
 from app.core.logging import setup_logging
+from app.schemas.webhook import RubikaWebhookAdapterPayload, RubikaWebhookResponse
+from app.services.webhook_service import WebhookService
+from app.db.session import engine
+from app.workers.queue import redis_ping
 
 setup_logging()
 
@@ -111,7 +124,76 @@ async def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
 
+async def _database_ready() -> bool:
+    try:
+        async with engine.connect() as connection:
+            await connection.execute(text("SELECT 1"))
+        return True
+    except Exception:
+        return False
+
+
+@app.get(f"{settings.api_v1_str}/ready")
+async def readiness_check() -> JSONResponse:
+    """Readiness endpoint for deployment verification."""
+    database_ready = await _database_ready()
+
+    try:
+        queue_ready = redis_ping()
+    except Exception:
+        queue_ready = False
+
+    services = {
+        "database": "ok" if database_ready else "error",
+        "redis": "ok" if queue_ready else "error",
+    }
+    is_ready = all(status == "ok" for status in services.values())
+    status_code = 200 if is_ready else 503
+
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": "ok" if is_ready else "degraded",
+            "services": services,
+        },
+    )
+
+
 @app.get("/")
 async def root() -> dict[str, str]:
     """Simple root status endpoint."""
     return {"message": "Rubika Bot SaaS API"}
+
+
+@app.post("/", response_model=RubikaWebhookResponse)
+async def root_webhook(
+    payload: RubikaWebhookAdapterPayload,
+    service: Annotated[WebhookService, Depends(get_webhook_service)],
+) -> RubikaWebhookResponse:
+    normalized = _normalize_rubika_payload(payload.model_dump())
+    event_type = _validate_event_type(normalized.get("event_type"))
+    rubika_channel_id = _validate_channel_id(normalized.get("rubika_channel_id"))
+    payload_data = {
+        "event_type": event_type,
+        "message": normalized.get("message"),
+        "sender_rubika_user_id": normalized.get("sender_rubika_user_id"),
+        "message_id": normalized.get("message_id"),
+    }
+
+    if event_type == "message_received":
+        result = await service.process_message_event_from_rubika_channel(
+            rubika_channel_id=rubika_channel_id,
+            secret=None,
+            payload=payload_data,
+        )
+    else:
+        result = await service.process_delivery_event_from_rubika_channel(
+            rubika_channel_id=rubika_channel_id,
+            secret=None,
+            payload=payload_data,
+        )
+
+    return RubikaWebhookResponse(
+        accepted=bool(result["accepted"]),
+        reason=result.get("reason") or f"accepted:{event_type}",
+    )

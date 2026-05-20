@@ -13,6 +13,12 @@ This document describes how to run the project locally and in a self-hosted envi
 
 Use `.env` from `.env.example`.
 
+Reference details:
+
+- `docs/environment-reference.md`
+- `docs/customer-deployment-template.md`
+- `docs/customer-handover-checklist.md`
+
 Required minimum:
 
 - `DATABASE_URL`
@@ -26,6 +32,8 @@ Optional:
 - `RUBIKA_BOT_TOKEN` (for scheduled posts sending)
 - `RUBIKA_SEND_ENDPOINT` (default: `https://botapi.rubika.ir/v3/{TOKEN}/{METHOD}`)
 - `RUBIKA_SEND_METHOD` (default: `sendMessage`)
+- `SCHEDULER_INTERVAL_SECONDS` (default: `30`)
+- `SCHEDULER_BATCH_SIZE` (default: `100`)
 
 ## Local Run (development)
 

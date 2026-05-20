@@ -13,6 +13,11 @@ def get_redis_connection() -> Any:
     return redis_module.Redis.from_url(settings.redis_url, decode_responses=False)
 
 
+def redis_ping() -> bool:
+    """Return True when Redis is reachable for worker and scheduler traffic."""
+    return bool(get_redis_connection().ping())
+
+
 def get_queue(
     *,
     queue_name: str = SCHEDULED_POST_QUEUE,

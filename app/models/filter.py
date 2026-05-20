@@ -27,7 +27,12 @@ class Filter(Base):
     )
     pattern: Mapped[str] = mapped_column(String(500), nullable=False)
     action: Mapped[FilterAction] = mapped_column(
-        SQLEnum(FilterAction, name="filter_action"), nullable=False
+        SQLEnum(
+            FilterAction,
+            name="filter_action",
+            values_callable=lambda enum_cls: [item.value for item in enum_cls],
+        ),
+        nullable=False,
     )
     reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

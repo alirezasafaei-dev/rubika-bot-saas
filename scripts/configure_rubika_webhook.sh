@@ -4,7 +4,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-if [[ -z "${DATABASE_URL:-}" ]]; then
+if [[ -z "${DATABASE_URL:-}" || -z "${DOMAIN_FOR_RUBIKABOTSAAS:-}" || -z "${RUBIKA_BOT_TOKEN:-}" ]]; then
   set -a
   [[ -f .env ]] && . ./.env
   set +a
@@ -18,15 +18,18 @@ fi
 
 BASE_DOMAIN="${DOMAIN_FOR_RUBIKABOTSAAS:-${2:-}}"
 if [[ -z "${BASE_DOMAIN}" ]]; then
+  BASE_DOMAIN="https://rbsaas.alirezasafaeisystems.ir"
+fi
+if [[ -z "${BASE_DOMAIN}" ]]; then
   echo "DOMAIN_FOR_RUBIKABOTSAAS is required (or pass as arg2)." >&2
   exit 1
 fi
 
 CHANNEL_ID="${3:-}"
 if [[ -n "${CHANNEL_ID}" ]]; then
-  WEBHOOK_PATH="/api/v1/webhooks/rubika/${CHANNEL_ID}"
+  WEBHOOK_PATH="/"
 else
-  WEBHOOK_PATH="/api/v1/webhooks/rubika"
+  WEBHOOK_PATH="/"
 fi
 if [[ "${BASE_DOMAIN}" =~ ^https?:// ]]; then
   WEBHOOK_URL="${BASE_DOMAIN%/}${WEBHOOK_PATH}"

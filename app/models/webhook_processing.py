@@ -60,7 +60,11 @@ class MessageProcessingLog(Base):
         ForeignKey("auto_replies.id", ondelete="SET NULL"), nullable=True, index=True
     )
     outcome: Mapped[ProcessingOutcome] = mapped_column(
-        SQLEnum(ProcessingOutcome, name="processing_outcome"),
+        SQLEnum(
+            ProcessingOutcome,
+            name="processing_outcome",
+            values_callable=lambda enum_cls: [item.value for item in enum_cls],
+        ),
         nullable=False,
         index=True,
     )

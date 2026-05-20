@@ -19,6 +19,7 @@ The project is designed to be implemented incrementally through clearly defined 
 - [Project Structure](#project-structure)
 - [API Versioning](#api-versioning)
 - [Environment Configuration](#environment-configuration)
+- [Service Delivery Docs](#service-delivery-docs)
 - [Local Development Setup](#local-development-setup)
 - [Running the Application](#running-the-application)
 - [Database and Migrations](#database-and-migrations)
@@ -264,6 +265,28 @@ Versioning rules:
 ---
 
 ## Environment Configuration
+
+For delivery and production packaging, use:
+
+- `docs/service-model.md`
+- `docs/pricing-scope-matrix.md`
+- `docs/customer-prerequisites.md`
+- `docs/non-goals-v1.md`
+- `docs/environment-reference.md`
+- `docs/customer-deployment-template.md`
+- `docs/customer-handover-checklist.md`
+- `docs/demo-script.md`
+
+## Service Delivery Docs
+
+These docs define the sellable and deployable shape of `A05`:
+
+- `docs/service-model.md`
+- `docs/pricing-scope-matrix.md`
+- `docs/customer-prerequisites.md`
+- `docs/non-goals-v1.md`
+- `docs/deployment.md`
+- `docs/demo-script.md`
 
 Runtime configuration must come from environment variables.
 
