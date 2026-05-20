@@ -27,9 +27,9 @@ fi
 
 CHANNEL_ID="${3:-}"
 if [[ -n "${CHANNEL_ID}" ]]; then
-  WEBHOOK_PATH="/"
+  WEBHOOK_PATH="/api/v1/webhooks/rubika/${CHANNEL_ID}"
 else
-  WEBHOOK_PATH="/"
+  WEBHOOK_PATH="/api/v1/webhooks/rubika"
 fi
 if [[ "${BASE_DOMAIN}" =~ ^https?:// ]]; then
   WEBHOOK_URL="${BASE_DOMAIN%/}${WEBHOOK_PATH}"

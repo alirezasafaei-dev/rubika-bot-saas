@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     rubika_bot_name: str = Field(default="")
     rubika_bot_username: str = Field(default="")
     rubika_bot_token: str = Field(default="")
+    rubika_support_contact: str = Field(default="")
     rubika_send_endpoint: str = Field(default="")
     rubika_send_method: str = Field(default="sendMessage")
     rubika_send_timeout_seconds: int = Field(default=10)

@@ -13,6 +13,7 @@ class RubikaWebhookPayload(BaseModel):
     message: str | None = Field(default=None, max_length=2000)
     sender_rubika_user_id: str | None = Field(default=None, max_length=64)
     message_id: str | None = Field(default=None, max_length=128)
+    button_id: str | None = Field(default=None, max_length=128)
     sent_at: datetime | None = None
 
 
@@ -32,4 +33,5 @@ class RubikaWebhookAdapterPayload(BaseModel):
     message: str | None = Field(default=None, max_length=2000)
     sender_rubika_user_id: str | None = Field(default=None, max_length=64)
     message_id: str | None = Field(default=None, max_length=128)
+    button_id: str | None = Field(default=None, max_length=128)
     rubika_channel_id: str | None = Field(default=None, max_length=255)

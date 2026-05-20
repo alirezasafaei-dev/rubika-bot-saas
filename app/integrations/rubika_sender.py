@@ -42,7 +42,14 @@ def _build_send_url(token: str, method: str) -> str:
     return prepared
 
 
-async def send_text_message(channel_id: str, text: str) -> SendResult:
+async def send_text_message(
+    channel_id: str,
+    text: str,
+    *,
+    chat_keypad: dict | None = None,
+    inline_keypad: dict | None = None,
+    chat_keypad_type: str | None = None,
+) -> SendResult:
     """Send a text message through Rubika Bot API.
 
     If `RUBIKA_BOT_SEND_ENDPOINT` is not set, this returns a successful no-op.
@@ -61,6 +68,12 @@ async def send_text_message(channel_id: str, text: str) -> SendResult:
         "chat_id": channel_id,
         "text": text,
     }
+    if chat_keypad is not None:
+        payload["chat_keypad"] = chat_keypad
+    if inline_keypad is not None:
+        payload["inline_keypad"] = inline_keypad
+    if chat_keypad_type is not None:
+        payload["chat_keypad_type"] = chat_keypad_type
     timeout = settings.rubika_send_timeout_seconds
 
     try:

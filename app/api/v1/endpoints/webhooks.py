@@ -40,6 +40,7 @@ def _normalize_rubika_payload(payload: dict[str, object]) -> dict[str, str | Non
                 payload.get("sender_rubika_user_id")
             ),
             "message_id": _stringified(payload.get("message_id")),
+            "button_id": _optional_str(payload.get("button_id")),
             "rubika_channel_id": str(
                 payload.get("rubika_channel_id")
                 or payload.get("chat_id")
@@ -65,6 +66,13 @@ def _normalize_rubika_payload(payload: dict[str, object]) -> dict[str, str | Non
                 "message": _optional_str(new_message.get("text")),
                 "sender_rubika_user_id": _optional_str(new_message.get("sender_id")),
                 "message_id": _stringified(new_message.get("message_id")),
+                "button_id": _optional_str(
+                    (
+                        new_message.get("aux_data")
+                        if isinstance(new_message.get("aux_data"), dict)
+                        else {}
+                    ).get("button_id")
+                ),
                 "rubika_channel_id": str(
                     new_message.get("chat_id")
                     or update.get("chat_id")
@@ -73,30 +81,6 @@ def _normalize_rubika_payload(payload: dict[str, object]) -> dict[str, str | Non
                 )
                 if (
                     new_message.get("chat_id") is not None
-                    or update.get("chat_id") is not None
-                    or payload.get("chat_id") is not None
-                    or payload.get("chatId") is not None
-                )
-                else None,
-            }
-
-        if raw_event in {"receiveinlinemessage", "inlinemessage"}:
-            inline_message = update.get("inline_message")
-            if not isinstance(inline_message, dict):
-                inline_message = {}
-            return {
-                "event_type": "message_received",
-                "message": _optional_str(inline_message.get("text")),
-                "sender_rubika_user_id": _optional_str(inline_message.get("sender_id")),
-                "message_id": _stringified(inline_message.get("message_id")),
-                "rubika_channel_id": str(
-                    inline_message.get("chat_id")
-                    or update.get("chat_id")
-                    or payload.get("chat_id")
-                    or payload.get("chatId")
-                )
-                if (
-                    inline_message.get("chat_id") is not None
                     or update.get("chat_id") is not None
                     or payload.get("chat_id") is not None
                     or payload.get("chatId") is not None
@@ -125,11 +109,39 @@ def _normalize_rubika_payload(payload: dict[str, object]) -> dict[str, str | Non
                 else None,
             }
 
+    inline_message = payload.get("inline_message")
+    if isinstance(inline_message, dict):
+        return {
+            "event_type": "message_received",
+            "message": _optional_str(inline_message.get("text")),
+            "sender_rubika_user_id": _optional_str(inline_message.get("sender_id")),
+            "message_id": _stringified(inline_message.get("message_id")),
+            "button_id": _optional_str(
+                (
+                    inline_message.get("aux_data")
+                    if isinstance(inline_message.get("aux_data"), dict)
+                    else {}
+                ).get("button_id")
+            ),
+            "rubika_channel_id": str(
+                inline_message.get("chat_id")
+                or payload.get("chat_id")
+                or payload.get("chatId")
+            )
+            if (
+                inline_message.get("chat_id") is not None
+                or payload.get("chat_id") is not None
+                or payload.get("chatId") is not None
+            )
+            else None,
+        }
+
     return {
         "event_type": str(event_type) if event_type else None,
         "message": _optional_str(payload.get("message")),
         "sender_rubika_user_id": _optional_str(payload.get("sender_rubika_user_id")),
         "message_id": _stringified(payload.get("message_id")),
+        "button_id": _optional_str(payload.get("button_id")),
         "rubika_channel_id": str(
             payload.get("rubika_channel_id")
             or payload.get("chat_id")
@@ -175,6 +187,7 @@ async def _route_webhook(
         "message": normalized.get("message"),
         "sender_rubika_user_id": normalized.get("sender_rubika_user_id"),
         "message_id": normalized.get("message_id"),
+        "button_id": normalized.get("button_id"),
     }
 
     try:
@@ -226,6 +239,7 @@ async def rubika_webhook_channel(
         "message": normalized.get("message"),
         "sender_rubika_user_id": normalized.get("sender_rubika_user_id"),
         "message_id": normalized.get("message_id"),
+        "button_id": normalized.get("button_id"),
     }
 
     try:

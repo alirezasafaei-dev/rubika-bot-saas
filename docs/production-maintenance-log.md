@@ -45,6 +45,9 @@ Date: 2026-05-17
   - `curl -H "Host: rbsaas.alirezasafaeisystems.ir" https://rbsaas.alirezasafaeisystems.ir/api/v1/health`
   - `systemctl is-active rubika-api.service rubika-worker.service rubika-scheduler.service`
   - `alembic current`
+- Bot menu runtime dependencies:
+  - `RUBIKA_BOT_TOKEN` and `RUBIKA_SEND_ENDPOINT` must stay set for live replies.
+  - `RUBIKA_SUPPORT_CONTACT` should be set so the user-facing `contact` menu returns a real support path.
 - Optional periodic cleanup:
   - `sudo journalctl --vacuum-time=30d` (or size-based vacuum)
   - remove orphaned venv caches only if explicitly needed and after backup

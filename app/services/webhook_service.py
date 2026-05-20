@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from textwrap import dedent
 
 from app.core.config import settings
 from app.core.errors import ErrorCode, NotFoundError, UnauthorizedError
@@ -17,6 +18,12 @@ from app.repositories.webhook_event_repository import WebhookEventRepository
 
 
 class WebhookService:
+    MENU_HELP = "menu_help"
+    MENU_STATUS = "menu_status"
+    MENU_CONTACT = "menu_contact"
+    MENU_BACK = "menu_back"
+    MENU_START = "menu_start"
+
     def __init__(self, db_session) -> None:
         self.db = db_session
         self.channel_repo = ChannelRepository(db_session)
@@ -71,21 +78,134 @@ class WebhookService:
         return None
 
     @staticmethod
-    def _command_reply(message: str) -> str | None:
+    def _inline_back_keypad() -> dict:
+        return {
+            "rows": [
+                {
+                    "buttons": [
+                        {
+                            "id": WebhookService.MENU_BACK,
+                            "type": "Simple",
+                            "button_text": "بازگشت",
+                        }
+                    ]
+                }
+            ]
+        }
+
+    @classmethod
+    def _build_start_menu(cls) -> tuple[str, dict, dict]:
+        bot_name = (settings.rubika_bot_name or settings.app_name).strip() or "ربات"
+        text = dedent(
+            f"""
+            سلام 👋
+            به {bot_name} خوش آمدی.
+            از دکمه‌ها برای دیدن راهنما، وضعیت سرویس و مسیر تماس استفاده کن.
+            """
+        ).strip()
+        chat_keypad = {
+            "rows": [
+                {
+                    "buttons": [
+                        {"id": cls.MENU_HELP, "type": "Simple", "button_text": "راهنما"},
+                        {"id": cls.MENU_STATUS, "type": "Simple", "button_text": "وضعیت"},
+                    ]
+                },
+                {
+                    "buttons": [
+                        {"id": cls.MENU_CONTACT, "type": "Simple", "button_text": "تماس"}
+                    ]
+                },
+            ],
+            "resize_keyboard": True,
+            "on_time_keyboard": False,
+        }
+        inline_keypad = {
+            "rows": [
+                {
+                    "buttons": [
+                        {"id": cls.MENU_HELP, "type": "Simple", "button_text": "راهنما"},
+                        {"id": cls.MENU_STATUS, "type": "Simple", "button_text": "وضعیت"},
+                    ]
+                },
+                {
+                    "buttons": [
+                        {"id": cls.MENU_CONTACT, "type": "Simple", "button_text": "تماس"},
+                        {"id": cls.MENU_START, "type": "Simple", "button_text": "منوی اصلی"},
+                    ]
+                },
+            ]
+        }
+        return text, chat_keypad, inline_keypad
+
+    async def _menu_reply(
+        self,
+        *,
+        channel_id: int,
+        message: str,
+        button_id: str | None,
+    ) -> tuple[str, dict | None, dict | None, str | None] | None:
         normalized = message.strip().lower()
-        if normalized.startswith("/start"):
+        action = button_id or normalized
+        if normalized.startswith("/start") or action in {
+            self.MENU_BACK,
+            self.MENU_START,
+        }:
+            text, chat_keypad, inline_keypad = self._build_start_menu()
+            return text, chat_keypad, inline_keypad, "New"
+        if normalized.startswith("/help") or action == self.MENU_HELP:
             return (
-                "سلام 👋\n"
-                "من ربات روبیکا هستم.\n"
-                "دستورات:\n"
-                "• /help\n"
-                "• ارسال پیام برای پاسخ خودکار\n"
+                dedent(
+                    """
+                    راهنما:
+                    • /start منوی اصلی را باز می‌کند.
+                    • راهنما، وضعیت و تماس از دکمه‌ها هم در دسترس‌اند.
+                    • اگر برای پیام شما auto-reply تعریف شده باشد، همان پاسخ ارسال می‌شود.
+                    """
+                ).strip(),
+                None,
+                self._inline_back_keypad(),
+                None,
             )
-        if normalized.startswith("/help"):
+        if action == self.MENU_STATUS:
+            channel = await self._require_channel(channel_id)
+            active_auto_replies = await self.auto_reply_repo.list_active_by_channel(
+                channel_id=channel_id
+            )
+            active_filters = await self.filter_repo.list_active_by_channel(
+                channel_id=channel_id
+            )
             return (
-                "راهنما:\n"
-                "• پیام بفرست تا پاسخ خودکار بگیری.\n"
-                "• برای ارسال زمان‌بندی‌شده از پنل استفاده کن.\n"
+                dedent(
+                    f"""
+                    وضعیت سرویس:
+                    • کانال: {channel.name}
+                    • webhook: فعال
+                    • ارسال پیام: {"فعال" if settings.rubika_bot_token and settings.rubika_send_endpoint else "نیازمند تنظیمات"}
+                    • پاسخ‌خودکار فعال: {len(active_auto_replies)}
+                    • فیلتر فعال: {len(active_filters)}
+                    """
+                ).strip(),
+                None,
+                self._inline_back_keypad(),
+                None,
+            )
+        if action == self.MENU_CONTACT:
+            contact = (settings.rubika_support_contact or "").strip()
+            contact_line = (
+                f"• مسیر تماس: {contact}" if contact else "• مسیر تماس هنوز در تنظیمات ثبت نشده است."
+            )
+            return (
+                dedent(
+                    f"""
+                    تماس و پشتیبانی:
+                    {contact_line}
+                    • اگر نیاز به بازگشت داری، دکمه «بازگشت» را بزن.
+                    """
+                ).strip(),
+                None,
+                self._inline_back_keypad(),
+                None,
             )
         return None
 
@@ -116,8 +236,17 @@ class WebhookService:
         channel_id: int,
         rubika_channel_id: str,
         text: str,
+        chat_keypad: dict | None = None,
+        inline_keypad: dict | None = None,
+        chat_keypad_type: str | None = None,
     ) -> None:
-        result = await send_text_message(rubika_channel_id, text)
+        result = await send_text_message(
+            rubika_channel_id,
+            text,
+            chat_keypad=chat_keypad,
+            inline_keypad=inline_keypad,
+            chat_keypad_type=chat_keypad_type,
+        )
         if not result.ok:
             raise RuntimeError(result.error or f"failed to send reply for {channel_id}")
 
@@ -145,6 +274,7 @@ class WebhookService:
 
         message = payload.get("message")
         normalized_message = self._message_for_match(message)
+        button_id = payload.get("button_id")
         filters = await self.filter_repo.list_active_by_channel(channel_id=channel_id)
         matched_filter = self._find_filter_match(normalized_message, filters)
         if matched_filter is not None and normalized_message:
@@ -179,24 +309,32 @@ class WebhookService:
         auto_replies = await self.auto_reply_repo.list_active_by_channel(
             channel_id=channel_id
         )
-        command_reply = self._command_reply(normalized_message)
-        if command_reply is not None:
+        menu_reply = await self._menu_reply(
+            channel_id=channel_id,
+            message=normalized_message,
+            button_id=button_id if isinstance(button_id, str) else None,
+        )
+        if menu_reply is not None:
+            reply_text, chat_keypad, inline_keypad, chat_keypad_type = menu_reply
             await self._send_bot_reply(
                 channel_id=channel_id,
                 rubika_channel_id=(await self._require_channel(channel_id)).rubika_channel_id,
-                text=command_reply,
+                text=reply_text,
+                chat_keypad=chat_keypad,
+                inline_keypad=inline_keypad,
+                chat_keypad_type=chat_keypad_type,
             )
             await self._record_message_outcome(
                 event_id=event.id,
                 channel_id=channel_id,
                 outcome=ProcessingOutcome.AUTO_REPLIED,
                 payload=payload,
-                reason="command_reply",
+                reason="menu_reply",
             )
             await self.db.commit()
             return {
                 "accepted": True,
-                "reason": "command_reply",
+                "reason": "menu_reply",
             }
         for reply in auto_replies:
             if not reply.trigger_text:

@@ -30,6 +30,7 @@ Optional:
 - `TEST_DATABASE_URL` (local tests)
 - `WEBHOOK_SECRET` (for webhook validation)
 - `RUBIKA_BOT_TOKEN` (for scheduled posts sending)
+- `RUBIKA_SUPPORT_CONTACT` (support path shown in bot menu)
 - `RUBIKA_SEND_ENDPOINT` (default: `https://botapi.rubika.ir/v3/{TOKEN}/{METHOD}`)
 - `RUBIKA_SEND_METHOD` (default: `sendMessage`)
 - `SCHEDULER_INTERVAL_SECONDS` (default: `30`)
@@ -74,6 +75,7 @@ API:
 cd /home/deploy/rubika-bot-saas
 export DOMAIN_FOR_RUBIKABOTSAAS=https://rbsaas.alirezasafaeisystems.ir/
 export WEBHOOK_SECRET=... # optional
+export RUBIKA_SUPPORT_CONTACT=@your-support
 bash scripts/configure_rubika_webhook.sh
 ```
 
