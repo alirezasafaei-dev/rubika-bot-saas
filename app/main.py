@@ -18,9 +18,9 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.errors import AppException, ErrorCode
 from app.core.logging import setup_logging
+from app.db.session import engine
 from app.schemas.webhook import RubikaWebhookAdapterPayload, RubikaWebhookResponse
 from app.services.webhook_service import WebhookService
-from app.db.session import engine
 from app.workers.queue import redis_ping
 
 setup_logging()
