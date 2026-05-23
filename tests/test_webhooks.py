@@ -122,6 +122,7 @@ async def test_webhook_start_menu_sends_real_keypads(
     assert capture_send[0]["chat_keypad"]["rows"]
     assert capture_send[0]["inline_keypad"]["rows"]
     assert "خوش آمدی" in capture_send[0]["text"]
+    assert "راهنما" in capture_send[0]["text"]
 
 
 async def test_webhook_chat_button_click_routes_to_status(
@@ -165,8 +166,8 @@ async def test_webhook_chat_button_click_routes_to_status(
 
     assert response.status_code == 200
     assert response.json()["reason"] == "menu_reply"
-    assert "پاسخ‌خودکار فعال: 1" in capture_send[0]["text"]
-    assert "فیلتر فعال: 1" in capture_send[0]["text"]
+    assert "پاسخ‌خودکارهای فعال: 1" in capture_send[0]["text"]
+    assert "فیلترهای فعال: 1" in capture_send[0]["text"]
 
 
 async def test_webhook_inline_button_click_routes_to_help(
@@ -269,7 +270,7 @@ async def test_webhook_no_match_sends_guidance_reply(
 
     assert response.status_code == 200
     assert response.json()["reason"] == "message_processed"
-    assert "متوجه منظورت نشدم" in capture_send[0]["text"]
+    assert "پیام شما را متوجه نشدم" in capture_send[0]["text"]
     assert capture_send[0]["inline_keypad"]["rows"]
 
 
