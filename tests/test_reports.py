@@ -52,6 +52,14 @@ async def test_workspace_summary(
                 outcome=ProcessingOutcome.FILTER_BLOCKED,
                 filter_rule_id=None,
             ),
+            MessageProcessingLog(
+                channel_id=channel.id,
+                outcome=ProcessingOutcome.DELIVERY_RESULT,
+            ),
+            MessageProcessingLog(
+                channel_id=channel.id,
+                outcome=ProcessingOutcome.ERROR,
+            ),
         ]
     )
     await db_session.commit()
@@ -73,6 +81,8 @@ async def test_workspace_summary(
     assert data["summary"]["failed_posts"] == 1
     assert data["summary"]["auto_replies_sent"] == 1
     assert data["summary"]["deleted_messages"] == 1
+    assert data["summary"]["webhook_delivery_results"] == 1
+    assert data["summary"]["webhook_processing_errors"] == 1
 
 
 async def test_channel_summary(
@@ -108,6 +118,10 @@ async def test_channel_summary(
                 channel_id=channel.id,
                 outcome=ProcessingOutcome.FILTER_BLOCKED,
             ),
+            MessageProcessingLog(
+                channel_id=channel.id,
+                outcome=ProcessingOutcome.ERROR,
+            ),
         ]
     )
     await db_session.commit()
@@ -127,6 +141,7 @@ async def test_channel_summary(
     assert data["channel_id"] == channel.id
     assert data["summary"]["created_posts"] == 2
     assert data["summary"]["sent_posts"] == 1
+    assert data["summary"]["webhook_processing_errors"] == 1
 
 
 async def test_daily_report_returns_buckets(
@@ -154,6 +169,11 @@ async def test_daily_report_returns_buckets(
                 scheduled_at=start - timedelta(days=1),
                 created_at=start - timedelta(days=1),
             ),
+            MessageProcessingLog(
+                channel_id=channel.id,
+                outcome=ProcessingOutcome.ERROR,
+                created_at=start,
+            ),
         ]
     )
     await db_session.commit()
@@ -167,6 +187,7 @@ async def test_daily_report_returns_buckets(
     data = response.json()
     assert data["workspace_id"] == workspace.id
     assert len(data["items"]) == 2
+    assert data["items"][-1]["webhook_processing_errors"] >= 1
 
 
 async def test_reports_invalid_date_range(

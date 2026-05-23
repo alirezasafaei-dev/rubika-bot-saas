@@ -16,6 +16,13 @@ class FilterAction(enum.StrEnum):
     DELETE = "delete"
     WARN = "warn"
     BAN = "ban"
+    FLAG = "flag"
+    SHADOW_BLOCK = "shadow_block"
+
+
+class FilterMatchType(enum.StrEnum):
+    CONTAINS = "contains"
+    REGEX = "regex"
 
 
 class Filter(Base):
@@ -26,6 +33,15 @@ class Filter(Base):
         Integer, ForeignKey("channels.id", ondelete="CASCADE"), nullable=False
     )
     pattern: Mapped[str] = mapped_column(String(500), nullable=False)
+    match_type: Mapped[FilterMatchType] = mapped_column(
+        SQLEnum(
+            FilterMatchType,
+            name="filter_match_type",
+            values_callable=lambda enum_cls: [item.value for item in enum_cls],
+        ),
+        nullable=False,
+        default=FilterMatchType.CONTAINS,
+    )
     action: Mapped[FilterAction] = mapped_column(
         SQLEnum(
             FilterAction,

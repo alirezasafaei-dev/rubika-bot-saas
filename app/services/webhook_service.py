@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import json
+import re
 from textwrap import dedent
 
 from app.core.config import settings
 from app.core.errors import ErrorCode, NotFoundError, UnauthorizedError
 from app.integrations import send_text_message
+from app.models.auto_reply import AutoReply, AutoReplyMatchType
 from app.models.filter import Filter, FilterAction
 from app.models.webhook_processing import ProcessingOutcome
 from app.repositories.auto_reply_repository import AutoReplyRepository
@@ -23,6 +26,10 @@ class WebhookService:
     MENU_CONTACT = "menu_contact"
     MENU_BACK = "menu_back"
     MENU_START = "menu_start"
+    MENU_TEXT_HELP = "راهنما"
+    MENU_TEXT_STATUS = "وضعیت"
+    MENU_TEXT_CONTACT = "تماس"
+    MENU_TEXT_START = "منوی اصلی"
 
     def __init__(self, db_session) -> None:
         self.db = db_session
@@ -73,9 +80,43 @@ class WebhookService:
     @staticmethod
     def _find_filter_match(message: str, filters: list[Filter]) -> Filter | None:
         for item in filters:
-            if item.pattern and item.pattern.lower() in message:
+            if not item.pattern:
+                continue
+            if item.match_type.value == "regex":
+                try:
+                    if re.search(item.pattern, message, re.IGNORECASE):
+                        return item
+                except re.error:
+                    continue
+                continue
+            if item.pattern.lower() in message:
                 return item
         return None
+
+    @staticmethod
+    def _reply_matches(message: str, reply: AutoReply) -> bool:
+        if not reply.trigger_text:
+            return False
+        trigger = reply.trigger_text.lower()
+        if reply.match_type == AutoReplyMatchType.EXACT:
+            return message == trigger
+        return trigger in message
+
+    @staticmethod
+    def _decode_rich_reply(reply: AutoReply) -> list[str]:
+        items: list[str] = []
+        if reply.reply_text.strip():
+            items.append(reply.reply_text.strip())
+        if reply.rich_reply_json:
+            try:
+                decoded = json.loads(reply.rich_reply_json)
+            except json.JSONDecodeError:
+                decoded = []
+            if isinstance(decoded, list):
+                items.extend(
+                    item.strip() for item in decoded if isinstance(item, str) and item.strip()
+                )
+        return items
 
     @staticmethod
     def _inline_back_keypad() -> dict:
@@ -147,6 +188,14 @@ class WebhookService:
     ) -> tuple[str, dict | None, dict | None, str | None] | None:
         normalized = message.strip().lower()
         action = button_id or normalized
+        if not button_id:
+            text_actions = {
+                self.MENU_TEXT_HELP: self.MENU_HELP,
+                self.MENU_TEXT_STATUS: self.MENU_STATUS,
+                self.MENU_TEXT_CONTACT: self.MENU_CONTACT,
+                self.MENU_TEXT_START: self.MENU_START,
+            }
+            action = text_actions.get(message.strip(), action)
         if normalized.startswith("/start") or action in {
             self.MENU_BACK,
             self.MENU_START,
@@ -250,6 +299,52 @@ class WebhookService:
         if not result.ok:
             raise RuntimeError(result.error or f"failed to send reply for {channel_id}")
 
+    async def _send_auto_reply_flow(
+        self,
+        *,
+        channel_id: int,
+        rubika_channel_id: str,
+        reply: AutoReply,
+    ) -> None:
+        current = reply
+        visited: set[int] = set()
+        depth = 0
+        while current is not None and current.id not in visited and depth < 5:
+            visited.add(current.id)
+            for item in self._decode_rich_reply(current):
+                await self._send_bot_reply(
+                    channel_id=channel_id,
+                    rubika_channel_id=rubika_channel_id,
+                    text=item,
+                )
+            if current.next_step_id is None:
+                break
+            current = await self.auto_reply_repo.get_by_id_and_channel(
+                rule_id=current.next_step_id,
+                channel_id=channel_id,
+            )
+            if current is None or not current.is_active:
+                break
+            depth += 1
+
+    async def _record_processing_error(
+        self,
+        *,
+        event_id: int,
+        channel_id: int,
+        payload: dict,
+        reason: str,
+        auto_reply_rule_id: int | None = None,
+    ) -> None:
+        await self._record_message_outcome(
+            event_id=event_id,
+            channel_id=channel_id,
+            outcome=ProcessingOutcome.ERROR,
+            payload=payload,
+            auto_reply_rule_id=auto_reply_rule_id,
+            reason=reason[:500],
+        )
+
     async def process_message_event(
         self, *, channel_id: int, secret: str | None, payload: dict
     ) -> dict:
@@ -278,7 +373,11 @@ class WebhookService:
         filters = await self.filter_repo.list_active_by_channel(channel_id=channel_id)
         matched_filter = self._find_filter_match(normalized_message, filters)
         if matched_filter is not None and normalized_message:
-            if matched_filter.action in {FilterAction.DELETE, FilterAction.BAN}:
+            if matched_filter.action in {
+                FilterAction.DELETE,
+                FilterAction.BAN,
+                FilterAction.SHADOW_BLOCK,
+            }:
                 await self._record_message_outcome(
                     event_id=event.id,
                     channel_id=channel_id,
@@ -303,7 +402,7 @@ class WebhookService:
             await self.db.commit()
             return {
                 "accepted": True,
-                "reason": "warning",
+                "reason": "flagged" if matched_filter.action == FilterAction.FLAG else "warning",
             }
 
         auto_replies = await self.auto_reply_repo.list_active_by_channel(
@@ -316,14 +415,24 @@ class WebhookService:
         )
         if menu_reply is not None:
             reply_text, chat_keypad, inline_keypad, chat_keypad_type = menu_reply
-            await self._send_bot_reply(
-                channel_id=channel_id,
-                rubika_channel_id=(await self._require_channel(channel_id)).rubika_channel_id,
-                text=reply_text,
-                chat_keypad=chat_keypad,
-                inline_keypad=inline_keypad,
-                chat_keypad_type=chat_keypad_type,
-            )
+            try:
+                await self._send_bot_reply(
+                    channel_id=channel_id,
+                    rubika_channel_id=(await self._require_channel(channel_id)).rubika_channel_id,
+                    text=reply_text,
+                    chat_keypad=chat_keypad,
+                    inline_keypad=inline_keypad,
+                    chat_keypad_type=chat_keypad_type,
+                )
+            except RuntimeError as exc:
+                await self._record_processing_error(
+                    event_id=event.id,
+                    channel_id=channel_id,
+                    payload=payload,
+                    reason=f"menu_reply_send_failed: {exc}",
+                )
+                await self.db.commit()
+                return {"accepted": True, "reason": "send_failed"}
             await self._record_message_outcome(
                 event_id=event.id,
                 channel_id=channel_id,
@@ -337,14 +446,23 @@ class WebhookService:
                 "reason": "menu_reply",
             }
         for reply in auto_replies:
-            if not reply.trigger_text:
-                continue
-            if reply.trigger_text.lower() in normalized_message:
-                await self._send_bot_reply(
-                    channel_id=channel_id,
-                    rubika_channel_id=(await self._require_channel(channel_id)).rubika_channel_id,
-                    text=reply.reply_text,
-                )
+            if self._reply_matches(normalized_message, reply):
+                try:
+                    await self._send_auto_reply_flow(
+                        channel_id=channel_id,
+                        rubika_channel_id=(await self._require_channel(channel_id)).rubika_channel_id,
+                        reply=reply,
+                    )
+                except RuntimeError as exc:
+                    await self._record_processing_error(
+                        event_id=event.id,
+                        channel_id=channel_id,
+                        payload=payload,
+                        auto_reply_rule_id=reply.id,
+                        reason=f"auto_reply_send_failed: {exc}",
+                    )
+                    await self.db.commit()
+                    return {"accepted": True, "reason": "send_failed"}
                 await self._record_message_outcome(
                     event_id=event.id,
                     channel_id=channel_id,

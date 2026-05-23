@@ -12,6 +12,8 @@ class ReportSummaryItem(BaseModel):
     failed_posts: int
     auto_replies_sent: int
     deleted_messages: int
+    webhook_delivery_results: int
+    webhook_processing_errors: int
 
 
 class ReportSummaryResponse(BaseModel):
@@ -28,6 +30,7 @@ class DailyReportItem(BaseModel):
     failed_posts: int
     auto_replies_sent: int
     deleted_messages: int
+    webhook_processing_errors: int
 
 
 class DailyReportResponse(BaseModel):

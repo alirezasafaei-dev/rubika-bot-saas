@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.filter import Filter, FilterAction
+from app.models.filter import Filter, FilterAction, FilterMatchType
 
 
 class FilterRepository:
@@ -15,6 +15,7 @@ class FilterRepository:
         *,
         channel_id: int,
         pattern: str,
+        match_type: FilterMatchType,
         action: FilterAction,
         reason: str | None,
         is_active: bool = True,
@@ -22,6 +23,7 @@ class FilterRepository:
         obj = Filter(
             channel_id=channel_id,
             pattern=pattern,
+            match_type=match_type,
             action=action,
             reason=reason,
             is_active=is_active,
@@ -38,10 +40,19 @@ class FilterRepository:
         page: int,
         limit: int,
         is_active: bool | None = None,
+        query: str | None = None,
     ) -> tuple[list[Filter], int]:
         conditions = [Filter.channel_id == channel_id]
         if is_active is not None:
             conditions.append(Filter.is_active == is_active)
+        if query:
+            search = f"%{query}%"
+            conditions.append(
+                or_(
+                    Filter.pattern.ilike(search),
+                    Filter.reason.ilike(search),
+                )
+            )
 
         total_stmt = select(func.count(Filter.id)).where(*conditions)
         total = int((await self.db.execute(total_stmt)).scalar_one())
@@ -55,6 +66,13 @@ class FilterRepository:
         )
         items = list((await self.db.execute(stmt)).scalars().all())
         return items, total
+
+    async def count_active_by_channel(self, *, channel_id: int) -> int:
+        stmt = select(func.count(Filter.id)).where(
+            Filter.channel_id == channel_id,
+            Filter.is_active,
+        )
+        return int((await self.db.execute(stmt)).scalar_one())
 
     async def list_active_by_channel(self, *, channel_id: int) -> list[Filter]:
         stmt = (
@@ -80,12 +98,15 @@ class FilterRepository:
         *,
         rule: Filter,
         pattern: str | None,
+        match_type: FilterMatchType | None,
         action: FilterAction | None,
         reason: str | None,
         is_active: bool | None,
     ) -> Filter:
         if pattern is not None:
             rule.pattern = pattern
+        if match_type is not None:
+            rule.match_type = match_type
         if action is not None:
             rule.action = action
         if reason is not None:

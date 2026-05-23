@@ -1,17 +1,15 @@
-# Rubika Bot SaaS MVP Backend
+# Rubika Bot SaaS Backend
 
 A local-first, self-hostable backend API for managing Rubika bot automation workflows.
 
-This project provides the backend foundation for a Rubika bot management SaaS MVP, including workspace management, channel management, scheduled posts, auto-replies, message filters, reporting, and event processing.
-
-The project is designed to be implemented incrementally through clearly defined MVP phases.
+This project provides a production-oriented backend for Rubika bot management, including workspace management, channel management, scheduled posts, auto-replies, message filters, reporting, and event processing.
 
 ---
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [MVP Scope](#mvp-scope)
+- [Product Scope](#product-scope)
 - [Current Implementation Status](#current-implementation-status)
 - [Core Principles](#core-principles)
 - [Architecture](#architecture)
@@ -35,7 +33,7 @@ The project is designed to be implemented incrementally through clearly defined 
 
 ## Overview
 
-Rubika Bot SaaS MVP Backend is a backend service for managing automation features related to Rubika bots and channels.
+Rubika Bot SaaS Backend is a backend service for managing automation features related to Rubika bots and channels.
 
 The system is intended to support:
 
@@ -49,15 +47,15 @@ The system is intended to support:
 - Background job processing
 - Internal event/webhook handling
 
-The backend is designed as a modular monolithic application for the MVP stage. This keeps the system simple, maintainable, and deployable on a single server while preserving clean internal boundaries for future growth.
+The backend is designed as a modular monolithic application that stays simple to operate on a single server while preserving clean internal boundaries for future growth.
 
 ---
 
-## MVP Scope
+## Product Scope
 
-The MVP focuses on the minimum set of backend features required to manage Rubika bot automation in a reliable and production-oriented way.
+The current product scope covers the backend features required to run Rubika bot automation in a reliable production environment.
 
-The expected MVP modules are:
+The current product modules are:
 
 1. Project bootstrap and infrastructure
 2. Configuration and application setup
@@ -81,15 +79,13 @@ The exact implementation order and acceptance criteria should follow the project
 
 ## Current Implementation Status
 
-This repository may be implemented phase by phase.
-
-Depending on the current development phase, not all documented MVP features may be available yet.
+This repository is delivery-oriented and may continue to evolve in focused production-safe increments.
 
 Use the following sources as implementation references:
 
 - `README.md` for setup and project overview
 - `PROJECT_EXECUTION_GUIDE.md` for execution standards
-- `MVP_ROADMAP.md` for implementation phases and acceptance criteria
+- `MVP_ROADMAP.md` for legacy phased implementation history
 - `openapi.yaml` for API contract, when available
 
 If there is a conflict between documentation files, the execution guide and roadmap should be treated as the primary authority.
@@ -103,7 +99,7 @@ This project follows these principles:
 - Local-first development
 - Self-hostable runtime
 - No mandatory external SaaS dependency
-- Modular monolith for MVP
+- Modular monolith
 - Clear API versioning
 - Environment-based configuration
 - Strong validation at API boundaries
@@ -118,7 +114,7 @@ This project follows these principles:
 
 ## Architecture
 
-The MVP backend should be implemented as a modular FastAPI application.
+The backend is implemented as a modular FastAPI application.
 
 High-level architecture:
 
@@ -155,7 +151,7 @@ Worker Process
    v
 PostgreSQL / Internal Services
 
-The application should not be split into microservices during the MVP unless explicitly required by the roadmap.
+The application should not be split into microservices unless there is a clear operational reason to do so.
 
 ---
 

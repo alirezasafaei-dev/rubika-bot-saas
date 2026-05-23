@@ -34,6 +34,7 @@ async def create_filter(
         workspace_id=workspace_id,
         channel_id=channel_id,
         pattern=payload.pattern.strip(),
+        match_type=payload.match_type,
         action=payload.action,
         reason=payload.reason,
         is_active=payload.is_active,
@@ -51,22 +52,25 @@ async def list_filters(
     _current_user: Annotated[User, Depends(get_current_user)],
     service: Annotated[FilterService, Depends(get_filter_service)],
     is_active: bool | None = None,
+    query: str | None = Query(default=None, min_length=1, max_length=500),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
 ) -> FilterListResponse:
     del _current_user
-    items, total = await service.list_filters(
+    items, total, active_count = await service.list_filters(
         workspace_id=workspace_id,
         channel_id=channel_id,
         page=page,
         limit=limit,
         is_active=is_active,
+        query=(query.strip() if query else None),
     )
     return FilterListResponse(
         items=items,
         page=page,
         limit=limit,
         total=total,
+        active_count=active_count,
     )
 
 
@@ -108,6 +112,7 @@ async def update_filter(
         channel_id=channel_id,
         rule_id=rule_id,
         pattern=(payload.pattern.strip() if payload.pattern else None),
+        match_type=payload.match_type,
         action=payload.action,
         reason=payload.reason,
         is_active=payload.is_active,

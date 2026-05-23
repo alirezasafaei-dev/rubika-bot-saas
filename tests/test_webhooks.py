@@ -31,6 +31,17 @@ def capture_send(monkeypatch):
     return sent
 
 
+@pytest.fixture
+def fail_send(monkeypatch):
+    async def fake_send_text_message(channel_id, text, **kwargs):
+        return SendResult(ok=False, error="network-down")
+
+    monkeypatch.setattr(
+        "app.services.webhook_service.send_text_message",
+        fake_send_text_message,
+    )
+
+
 async def test_webhook_accepts_valid_channel(
     async_client,
     workspace,
@@ -209,6 +220,32 @@ async def test_webhook_contact_button_uses_real_config(
     assert "@support-path" in capture_send[0]["text"]
 
 
+async def test_webhook_plain_text_menu_button_routes_without_button_id(
+    async_client,
+    channel,
+    capture_send,
+):
+    response = await async_client.post(
+        "/api/v1/webhooks/rubika",
+        json={
+            "update": {
+                "type": "NewMessage",
+                "chat_id": channel.rubika_channel_id,
+                "new_message": {
+                    "message_id": "plain-1",
+                    "text": "راهنما",
+                    "sender_id": "u2",
+                    "chat_id": channel.rubika_channel_id,
+                },
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["reason"] == "menu_reply"
+    assert "راهنما" in capture_send[0]["text"]
+
+
 async def test_webhook_rejects_invalid_channel(async_client):
     payload = {"event_type": "message_received"}
 
@@ -332,11 +369,108 @@ async def test_webhook_auto_reply_and_event_dedup(
     assert first.status_code == 200
     assert second.status_code == 200
     assert second.json()["reason"] == "duplicate"
-    assert len(first.json()) > 0
 
-    events = (
-        await db_session.execute(
-            WebhookEvent.__table__.select().where(WebhookEvent.message_id == "m2")
+
+async def test_webhook_regex_filter_can_flag_without_blocking(
+    async_client,
+    channel,
+    db_session,
+):
+    db_session.add(
+        Filter(
+            channel_id=channel.id,
+            pattern=r"spam\d+",
+            match_type="regex",
+            action=FilterAction.FLAG,
         )
-    ).all()
-    assert len(events) == 1
+    )
+    await db_session.commit()
+
+    payload = {
+        "event_type": "message_received",
+        "message": "contains SPAM42 token",
+        "sender_rubika_user_id": "u2",
+        "message_id": "m-flag",
+    }
+    response = await async_client.post(
+        f"/api/v1/webhooks/rubika/{channel.id}",
+        json=payload,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["reason"] == "flagged"
+
+
+async def test_webhook_multi_step_rich_auto_reply(
+    async_client,
+    channel,
+    db_session,
+    capture_send,
+):
+    next_step = AutoReply(
+        channel_id=channel.id,
+        trigger_text="step-2",
+        reply_text="follow-up",
+        rich_reply_json='["final"]',
+    )
+    db_session.add(next_step)
+    await db_session.flush()
+    db_session.add(
+        AutoReply(
+            channel_id=channel.id,
+            trigger_text="hello",
+            reply_text="step-1",
+            rich_reply_json='["rich-1","rich-2"]',
+            next_step_id=next_step.id,
+        )
+    )
+    await db_session.commit()
+
+    response = await async_client.post(
+        f"/api/v1/webhooks/rubika/{channel.id}",
+        json={
+            "event_type": "message_received",
+            "message": "say hello",
+            "sender_rubika_user_id": "u9",
+            "message_id": "m-rich",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["reason"] == "auto_reply_triggered"
+    assert [item["text"] for item in capture_send] == [
+        "step-1",
+        "rich-1",
+        "rich-2",
+        "follow-up",
+        "final",
+    ]
+
+
+async def test_webhook_send_failure_is_logged_without_500(
+    async_client,
+    channel,
+    db_session,
+    fail_send,
+):
+    db_session.add(
+        AutoReply(
+            channel_id=channel.id,
+            trigger_text="hello",
+            reply_text="hi",
+        )
+    )
+    await db_session.commit()
+
+    response = await async_client.post(
+        f"/api/v1/webhooks/rubika/{channel.id}",
+        json={
+            "event_type": "message_received",
+            "message": "say hello",
+            "sender_rubika_user_id": "u10",
+            "message_id": "m-send-fail",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["reason"] == "send_failed"

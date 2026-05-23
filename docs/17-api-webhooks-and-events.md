@@ -1,4 +1,4 @@
-# Webhooks and Events API (MVP)
+# Webhooks and Events API
 
 ## Incoming Rubika Webhook
 

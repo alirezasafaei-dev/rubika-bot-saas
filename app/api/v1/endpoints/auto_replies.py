@@ -36,7 +36,10 @@ async def create_auto_reply(
         workspace_id=workspace_id,
         channel_id=channel_id,
         trigger_text=payload.trigger_text.strip(),
+        match_type=payload.match_type,
         reply_text=payload.reply_text.strip(),
+        rich_reply=payload.rich_reply,
+        next_step_id=payload.next_step_id,
         is_active=payload.is_active,
     )
     return AutoReplyResponse.model_validate(rule)
@@ -52,22 +55,25 @@ async def list_auto_replies(
     _current_user: Annotated[User, Depends(get_current_user)],
     service: Annotated[AutoReplyService, Depends(get_auto_reply_service)],
     is_active: bool | None = None,
+    query: str | None = Query(default=None, min_length=1, max_length=500),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
 ) -> AutoReplyListResponse:
     del _current_user
-    items, total = await service.list_replies(
+    items, total, active_count = await service.list_replies(
         workspace_id=workspace_id,
         channel_id=channel_id,
         page=page,
         limit=limit,
         is_active=is_active,
+        query=(query.strip() if query else None),
     )
     return AutoReplyListResponse(
         items=items,
         page=page,
         limit=limit,
         total=total,
+        active_count=active_count,
     )
 
 
@@ -144,8 +150,11 @@ async def update_auto_reply(
         channel_id=channel_id,
         rule_id=rule_id,
         trigger_text=(payload.trigger_text.strip() if payload.trigger_text else None),
+        match_type=payload.match_type,
         reply_text=(payload.reply_text.strip() if payload.reply_text else None),
+        rich_reply=payload.rich_reply,
         is_active=payload.is_active,
+        next_step_id=payload.next_step_id,
     )
     return AutoReplyResponse.model_validate(rule)
 

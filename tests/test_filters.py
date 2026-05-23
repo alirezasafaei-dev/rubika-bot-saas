@@ -11,7 +11,12 @@ async def test_create_filter(
     workspace,
     channel,
 ):
-    payload = {"pattern": "spam", "action": "delete", "reason": "spam message"}
+    payload = {
+        "pattern": "spam",
+        "match_type": "contains",
+        "action": "delete",
+        "reason": "spam message",
+    }
 
     response = await async_client.post(
         f"/api/v1/workspaces/{workspace.id}/channels/{channel.id}/filters",
@@ -23,6 +28,7 @@ async def test_create_filter(
     data = response.json()
     assert data["channel_id"] == channel.id
     assert data["pattern"] == "spam"
+    assert data["match_type"] == "contains"
     assert data["action"] == "delete"
 
 
@@ -51,6 +57,35 @@ async def test_list_filters(
     assert data["page"] == 1
     assert data["limit"] == 20
     assert data["total"] >= 1
+    assert data["active_count"] >= 1
+
+
+async def test_list_filters_supports_query(
+    async_client,
+    auth_headers,
+    workspace,
+    channel,
+):
+    await async_client.post(
+        f"/api/v1/workspaces/{workspace.id}/channels/{channel.id}/filters",
+        json={"pattern": "spam", "action": "delete", "reason": "ads block"},
+        headers=auth_headers,
+    )
+    await async_client.post(
+        f"/api/v1/workspaces/{workspace.id}/channels/{channel.id}/filters",
+        json={"pattern": "scam", "action": "warn", "reason": "fraud"},
+        headers=auth_headers,
+    )
+
+    response = await async_client.get(
+        f"/api/v1/workspaces/{workspace.id}/channels/{channel.id}/filters?query=fraud",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["items"][0]["pattern"] == "scam"
 
 
 async def test_get_filter(
@@ -124,3 +159,35 @@ async def test_delete_filter(
     )
 
     assert response.status_code == 204
+
+
+async def test_create_regex_filter(
+    async_client,
+    auth_headers,
+    workspace,
+    channel,
+):
+    response = await async_client.post(
+        f"/api/v1/workspaces/{workspace.id}/channels/{channel.id}/filters",
+        json={"pattern": "spam\\d+", "match_type": "regex", "action": "flag"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 201
+    assert response.json()["match_type"] == "regex"
+    assert response.json()["action"] == "flag"
+
+
+async def test_reject_invalid_regex_filter(
+    async_client,
+    auth_headers,
+    workspace,
+    channel,
+):
+    response = await async_client.post(
+        f"/api/v1/workspaces/{workspace.id}/channels/{channel.id}/filters",
+        json={"pattern": "(spam", "match_type": "regex", "action": "delete"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 422

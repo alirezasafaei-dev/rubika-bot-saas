@@ -160,6 +160,18 @@ class ReportService:
             since=start_dt,
             until=end_dt,
         )
+        delivery_result_count = await self.log_repo.count_by_outcome(
+            channel_ids=channel_ids,
+            outcome=ProcessingOutcome.DELIVERY_RESULT,
+            since=start_dt,
+            until=end_dt,
+        )
+        error_count = await self.log_repo.count_by_outcome(
+            channel_ids=channel_ids,
+            outcome=ProcessingOutcome.ERROR,
+            since=start_dt,
+            until=end_dt,
+        )
         return {
             "created_posts": total,
             "scheduled_posts": total,
@@ -167,6 +179,8 @@ class ReportService:
             "failed_posts": failed,
             "auto_replies_sent": auto_reply_count,
             "deleted_messages": filter_count,
+            "webhook_delivery_results": delivery_result_count,
+            "webhook_processing_errors": error_count,
         }
 
     async def get_channel_summary(
@@ -197,6 +211,18 @@ class ReportService:
             since=start_dt,
             until=end_dt,
         )
+        delivery_result_count = await self.log_repo.count_by_outcome(
+            channel_ids=[channel_id],
+            outcome=ProcessingOutcome.DELIVERY_RESULT,
+            since=start_dt,
+            until=end_dt,
+        )
+        error_count = await self.log_repo.count_by_outcome(
+            channel_ids=[channel_id],
+            outcome=ProcessingOutcome.ERROR,
+            since=start_dt,
+            until=end_dt,
+        )
         return {
             "created_posts": total,
             "scheduled_posts": total,
@@ -204,6 +230,8 @@ class ReportService:
             "failed_posts": failed,
             "auto_replies_sent": auto_reply_count,
             "deleted_messages": filter_count,
+            "webhook_delivery_results": delivery_result_count,
+            "webhook_processing_errors": error_count,
         }
 
     async def get_daily(
@@ -270,6 +298,7 @@ class ReportService:
                 "failed_posts": 0,
                 "auto_replies_sent": 0,
                 "deleted_messages": 0,
+                "webhook_processing_errors": 0,
             }
 
         for created_at, status in posts:
@@ -289,6 +318,8 @@ class ReportService:
                 buckets[key]["auto_replies_sent"] += 1
             elif outcome == ProcessingOutcome.FILTER_BLOCKED:
                 buckets[key]["deleted_messages"] += 1
+            elif outcome == ProcessingOutcome.ERROR:
+                buckets[key]["webhook_processing_errors"] += 1
 
         return [
             {
@@ -297,6 +328,7 @@ class ReportService:
                 "failed_posts": metrics["failed_posts"],
                 "auto_replies_sent": metrics["auto_replies_sent"],
                 "deleted_messages": metrics["deleted_messages"],
+                "webhook_processing_errors": metrics["webhook_processing_errors"],
             }
             for key, metrics in buckets.items()
         ]

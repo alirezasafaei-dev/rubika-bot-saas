@@ -58,3 +58,42 @@ class MessageProcessingLogRepository:
             MessageProcessingLog.created_at <= until,
         )
         return int((await self.db.scalar(stmt)) or 0)
+
+    async def count_by_outcome(
+        self,
+        *,
+        channel_ids: list[int],
+        outcome: ProcessingOutcome,
+        since: datetime,
+        until: datetime,
+    ) -> int:
+        stmt = select(func.count(MessageProcessingLog.id)).where(
+            MessageProcessingLog.channel_id.in_(channel_ids),
+            MessageProcessingLog.outcome == outcome,
+            MessageProcessingLog.created_at >= since,
+            MessageProcessingLog.created_at <= until,
+        )
+        return int((await self.db.scalar(stmt)) or 0)
+
+    async def list_auto_reply_logs(
+        self,
+        *,
+        channel_id: int,
+        page: int,
+        limit: int,
+    ) -> tuple[list[MessageProcessingLog], int]:
+        conditions = [
+            MessageProcessingLog.channel_id == channel_id,
+            MessageProcessingLog.auto_reply_rule_id.is_not(None),
+        ]
+        total_stmt = select(func.count(MessageProcessingLog.id)).where(*conditions)
+        total = int((await self.db.scalar(total_stmt)) or 0)
+        stmt = (
+            select(MessageProcessingLog)
+            .where(*conditions)
+            .order_by(MessageProcessingLog.created_at.desc(), MessageProcessingLog.id.desc())
+            .offset((page - 1) * limit)
+            .limit(limit)
+        )
+        items = list((await self.db.execute(stmt)).scalars().all())
+        return items, total
