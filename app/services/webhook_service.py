@@ -135,6 +135,18 @@ class WebhookService:
         }
 
     @classmethod
+    def _build_no_match_reply(cls) -> tuple[str, dict]:
+        return (
+            dedent(
+                """
+                متوجه منظورت نشدم.
+                یکی از گزینه‌های «راهنما»، «وضعیت» یا «تماس» را بزن، یا /start را بفرست.
+                """
+            ).strip(),
+            cls._inline_back_keypad(),
+        )
+
+    @classmethod
     def _build_start_menu(cls) -> tuple[str, dict, dict]:
         bot_name = (settings.rubika_bot_name or settings.app_name).strip() or "ربات"
         text = dedent(
@@ -484,6 +496,17 @@ class WebhookService:
             payload=payload,
             reason="no_match",
         )
+        if normalized_message:
+            reply_text, inline_keypad = self._build_no_match_reply()
+            try:
+                await self._send_bot_reply(
+                    channel_id=channel_id,
+                    rubika_channel_id=(await self._require_channel(channel_id)).rubika_channel_id,
+                    text=reply_text,
+                    inline_keypad=inline_keypad,
+                )
+            except RuntimeError:
+                pass
         await self.db.commit()
         return {"accepted": True, "reason": "message_processed"}
 

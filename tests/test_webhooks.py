@@ -246,6 +246,33 @@ async def test_webhook_plain_text_menu_button_routes_without_button_id(
     assert "راهنما" in capture_send[0]["text"]
 
 
+async def test_webhook_no_match_sends_guidance_reply(
+    async_client,
+    channel,
+    capture_send,
+):
+    response = await async_client.post(
+        "/api/v1/webhooks/rubika",
+        json={
+            "update": {
+                "type": "NewMessage",
+                "chat_id": channel.rubika_channel_id,
+                "new_message": {
+                    "message_id": "unknown-1",
+                    "text": "چیز نامشخص",
+                    "sender_id": "u2",
+                    "chat_id": channel.rubika_channel_id,
+                },
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["reason"] == "message_processed"
+    assert "متوجه منظورت نشدم" in capture_send[0]["text"]
+    assert capture_send[0]["inline_keypad"]["rows"]
+
+
 async def test_webhook_rejects_invalid_channel(async_client):
     payload = {"event_type": "message_received"}
 
