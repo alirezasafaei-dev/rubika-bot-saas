@@ -253,6 +253,9 @@ async def test_webhook_plain_text_menu_button_routes_without_button_id(
         ("کمک", "راهنما"),
         ("پشتیبانی", "تماس و پشتیبانی"),
         ("status", "وضعیت سرویس"),
+        ("سلام", "برای شروع"),
+        ("ممنون", "خواهش می‌کنم"),
+        ("تماس با پشتیبانی", "تماس و پشتیبانی"),
     ],
 )
 async def test_webhook_natural_language_aliases_route_to_menu(

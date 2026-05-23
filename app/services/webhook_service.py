@@ -30,6 +30,8 @@ class WebhookService:
     MENU_TEXT_STATUS = "وضعیت"
     MENU_TEXT_CONTACT = "تماس"
     MENU_TEXT_START = "منوی اصلی"
+    INTENT_GREETING = "intent_greeting"
+    INTENT_THANKS = "intent_thanks"
 
     @staticmethod
     def _normalize_text(text: str) -> str:
@@ -62,12 +64,23 @@ class WebhookService:
             "تماس": cls.MENU_CONTACT,
             "پشتیبانی": cls.MENU_CONTACT,
             "پشتيبانی": cls.MENU_CONTACT,
+            "ارتباط با پشتیبانی": cls.MENU_CONTACT,
+            "تماس با پشتیبانی": cls.MENU_CONTACT,
+            "تماس با پشتيبانی": cls.MENU_CONTACT,
             "support": cls.MENU_CONTACT,
             "منوی اصلی": cls.MENU_START,
             "منو اصلی": cls.MENU_START,
             "منوی اصلي": cls.MENU_START,
             "شروع": cls.MENU_START,
             "start": cls.MENU_START,
+            "سلام": cls.INTENT_GREETING,
+            "سلام ربات": cls.INTENT_GREETING,
+            "hi": cls.INTENT_GREETING,
+            "hello": cls.INTENT_GREETING,
+            "ممنون": cls.INTENT_THANKS,
+            "مرسی": cls.INTENT_THANKS,
+            "سپاس": cls.INTENT_THANKS,
+            "thanks": cls.INTENT_THANKS,
         }
         return text_actions.get(normalized, normalized)
 
@@ -187,6 +200,20 @@ class WebhookService:
         )
 
     @classmethod
+    def _build_greeting_reply(cls) -> tuple[str, dict]:
+        return (
+            "سلام 👋 برای شروع از گزینه‌های راهنما، وضعیت یا تماس استفاده کن.",
+            cls._inline_back_keypad(),
+        )
+
+    @classmethod
+    def _build_thanks_reply(cls) -> tuple[str, dict]:
+        return (
+            "خواهش می‌کنم 🌷 اگر خواستی می‌توانی از راهنما، وضعیت یا تماس استفاده کنی.",
+            cls._inline_back_keypad(),
+        )
+
+    @classmethod
     def _build_start_menu(cls) -> tuple[str, dict, dict]:
         bot_name = (settings.rubika_bot_name or settings.app_name).strip() or "ربات"
         text = dedent(
@@ -266,6 +293,12 @@ class WebhookService:
                 self._inline_back_keypad(),
                 None,
             )
+        if action == self.INTENT_GREETING:
+            reply_text, inline_keypad = self._build_greeting_reply()
+            return reply_text, None, inline_keypad, None
+        if action == self.INTENT_THANKS:
+            reply_text, inline_keypad = self._build_thanks_reply()
+            return reply_text, None, inline_keypad, None
         if action == self.MENU_STATUS:
             channel = await self._require_channel(channel_id)
             active_auto_replies = await self.auto_reply_repo.list_active_by_channel(
