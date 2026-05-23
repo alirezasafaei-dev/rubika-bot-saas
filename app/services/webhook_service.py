@@ -32,17 +32,22 @@ class WebhookService:
     MENU_TEXT_START = "منوی اصلی"
 
     @staticmethod
-    def _normalize_menu_text(text: str) -> str:
+    def _normalize_text(text: str) -> str:
         return (
             text.strip()
             .lower()
             .replace("ي", "ی")
             .replace("ك", "ک")
             .replace("‌", " ")
+            .replace("_", " ")
             .replace("?", "")
             .replace("؟", "")
             .replace("!", "")
         )
+
+    @classmethod
+    def _normalize_menu_text(cls, text: str) -> str:
+        return cls._normalize_text(text)
 
     @classmethod
     def _resolve_text_action(cls, text: str) -> str:
@@ -101,7 +106,7 @@ class WebhookService:
 
     @staticmethod
     def _message_for_match(raw_message: str | None) -> str:
-        return (raw_message or "").strip().lower()
+        return WebhookService._normalize_text(raw_message or "")
 
     @staticmethod
     def _excerpt(message: str | None) -> str | None:
@@ -124,7 +129,7 @@ class WebhookService:
                 except re.error:
                     continue
                 continue
-            if item.pattern.lower() in message:
+            if WebhookService._normalize_text(item.pattern) in message:
                 return item
         return None
 
@@ -132,7 +137,7 @@ class WebhookService:
     def _reply_matches(message: str, reply: AutoReply) -> bool:
         if not reply.trigger_text:
             return False
-        trigger = reply.trigger_text.lower()
+        trigger = WebhookService._normalize_text(reply.trigger_text)
         if reply.match_type == AutoReplyMatchType.EXACT:
             return message == trigger
         return trigger in message

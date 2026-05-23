@@ -465,6 +465,34 @@ async def test_webhook_regex_filter_can_flag_without_blocking(
     assert response.json()["reason"] == "flagged"
 
 
+async def test_webhook_contains_filter_matches_persian_variant_text(
+    async_client,
+    channel,
+    db_session,
+):
+    db_session.add(
+        Filter(
+            channel_id=channel.id,
+            pattern="پشتيباني",
+            action=FilterAction.WARN,
+        )
+    )
+    await db_session.commit()
+
+    response = await async_client.post(
+        f"/api/v1/webhooks/rubika/{channel.id}",
+        json={
+            "event_type": "message_received",
+            "message": "نیاز به پشتیبانی دارم",
+            "sender_rubika_user_id": "u-filter-norm",
+            "message_id": "filter-norm-1",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["reason"] == "warning"
+
+
 async def test_webhook_multi_step_rich_auto_reply(
     async_client,
     channel,
@@ -509,6 +537,36 @@ async def test_webhook_multi_step_rich_auto_reply(
         "follow-up",
         "final",
     ]
+
+
+async def test_webhook_auto_reply_matches_persian_variant_text(
+    async_client,
+    channel,
+    db_session,
+    capture_send,
+):
+    db_session.add(
+        AutoReply(
+            channel_id=channel.id,
+            trigger_text="پشتيباني",
+            reply_text="مسیر پشتیبانی",
+        )
+    )
+    await db_session.commit()
+
+    response = await async_client.post(
+        f"/api/v1/webhooks/rubika/{channel.id}",
+        json={
+            "event_type": "message_received",
+            "message": "پشتیبانی فوری",
+            "sender_rubika_user_id": "u-reply-norm",
+            "message_id": "reply-norm-1",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["reason"] == "auto_reply_triggered"
+    assert capture_send[0]["text"] == "مسیر پشتیبانی"
 
 
 async def test_webhook_send_failure_is_logged_without_500(
