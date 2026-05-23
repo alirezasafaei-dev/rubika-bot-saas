@@ -5,6 +5,10 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 TMP_BOOTSTRAP_SCRIPT="$(mktemp)"
 trap 'rm -f "$TMP_BOOTSTRAP_SCRIPT"' EXIT
+UV_BIN="uv"
+if ! command -v uv >/dev/null 2>&1 && [ -x "${REPO_ROOT}/.venv/bin/uv" ]; then
+  UV_BIN="${REPO_ROOT}/.venv/bin/uv"
+fi
 
 if [[ -z "${DATABASE_URL:-}" ]]; then
   set -a
@@ -48,17 +52,17 @@ sync_url = f"sqlite:///{db_file}"
 engine = create_engine(sync_url, future=True)
 Base.metadata.create_all(engine)
 PY
-  SQLITE_FILE="$db_file_abs" uv run python "$TMP_BOOTSTRAP_SCRIPT"
+  SQLITE_FILE="$db_file_abs" "${UV_BIN}" run python "$TMP_BOOTSTRAP_SCRIPT"
 }
 
 echo "Checking migrations against: $DATABASE_URL"
 echo "Current head(s):"
-uv run alembic heads
+"${UV_BIN}" run alembic heads
 
 echo "Applying migrations..."
 set +e
 LOG_FILE="$(mktemp)"
-uv run alembic upgrade head 2>&1 | tee "$LOG_FILE"
+"${UV_BIN}" run alembic upgrade head 2>&1 | tee "$LOG_FILE"
 STATUS=${PIPESTATUS[0]}
 set -e
 
@@ -72,7 +76,7 @@ if [[ "$DATABASE_URL" == sqlite* ]] && [[ "${DATABASE_URL}" == *"+aiosqlite://"*
   if grep -qE "near \"ALTER\": syntax error|duplicate column name: hashed_password|ALTER TABLE users ALTER COLUMN" "$LOG_FILE"; then
     if [[ "${AUTO_REPAIR_SQLITE:-0}" == "1" ]]; then
       bootstrap_sqlite_from_models "$DATABASE_URL"
-      uv run alembic stamp head
+      "${UV_BIN}" run alembic stamp head
       rm -f "$LOG_FILE"
       echo "SQLite failure handled by rebuilding from current SQLAlchemy models and stamping head."
       exit 0
