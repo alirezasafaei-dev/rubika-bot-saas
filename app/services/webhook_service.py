@@ -31,6 +31,41 @@ class WebhookService:
     MENU_TEXT_CONTACT = "تماس"
     MENU_TEXT_START = "منوی اصلی"
 
+    @staticmethod
+    def _normalize_menu_text(text: str) -> str:
+        return (
+            text.strip()
+            .lower()
+            .replace("ي", "ی")
+            .replace("ك", "ک")
+            .replace("‌", " ")
+            .replace("?", "")
+            .replace("؟", "")
+            .replace("!", "")
+        )
+
+    @classmethod
+    def _resolve_text_action(cls, text: str) -> str:
+        normalized = cls._normalize_menu_text(text)
+        text_actions = {
+            "راهنما": cls.MENU_HELP,
+            "کمک": cls.MENU_HELP,
+            "help": cls.MENU_HELP,
+            "وضعیت": cls.MENU_STATUS,
+            "وضعيت": cls.MENU_STATUS,
+            "status": cls.MENU_STATUS,
+            "تماس": cls.MENU_CONTACT,
+            "پشتیبانی": cls.MENU_CONTACT,
+            "پشتيبانی": cls.MENU_CONTACT,
+            "support": cls.MENU_CONTACT,
+            "منوی اصلی": cls.MENU_START,
+            "منو اصلی": cls.MENU_START,
+            "منوی اصلي": cls.MENU_START,
+            "شروع": cls.MENU_START,
+            "start": cls.MENU_START,
+        }
+        return text_actions.get(normalized, normalized)
+
     def __init__(self, db_session) -> None:
         self.db = db_session
         self.channel_repo = ChannelRepository(db_session)
@@ -201,16 +236,10 @@ class WebhookService:
         message: str,
         button_id: str | None,
     ) -> tuple[str, dict | None, dict | None, str | None] | None:
-        normalized = message.strip().lower()
+        normalized = self._normalize_menu_text(message)
         action = button_id or normalized
         if not button_id:
-            text_actions = {
-                self.MENU_TEXT_HELP: self.MENU_HELP,
-                self.MENU_TEXT_STATUS: self.MENU_STATUS,
-                self.MENU_TEXT_CONTACT: self.MENU_CONTACT,
-                self.MENU_TEXT_START: self.MENU_START,
-            }
-            action = text_actions.get(message.strip(), action)
+            action = self._resolve_text_action(message)
         if normalized.startswith("/start") or action in {
             self.MENU_BACK,
             self.MENU_START,

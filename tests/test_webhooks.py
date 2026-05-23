@@ -247,6 +247,42 @@ async def test_webhook_plain_text_menu_button_routes_without_button_id(
     assert "راهنما" in capture_send[0]["text"]
 
 
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("کمک", "راهنما"),
+        ("پشتیبانی", "تماس و پشتیبانی"),
+        ("status", "وضعیت سرویس"),
+    ],
+)
+async def test_webhook_natural_language_aliases_route_to_menu(
+    async_client,
+    channel,
+    capture_send,
+    text,
+    expected,
+):
+    response = await async_client.post(
+        "/api/v1/webhooks/rubika",
+        json={
+            "update": {
+                "type": "NewMessage",
+                "chat_id": channel.rubika_channel_id,
+                "new_message": {
+                    "message_id": f"alias-{text}",
+                    "text": text,
+                    "sender_id": "u2",
+                    "chat_id": channel.rubika_channel_id,
+                },
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["reason"] == "menu_reply"
+    assert expected in capture_send[0]["text"]
+
+
 async def test_webhook_no_match_sends_guidance_reply(
     async_client,
     channel,
