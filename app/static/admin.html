@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>پنل ادمین روبی پنل</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb; --accent:#22c55e; --danger:#ef4444; --line:#334155; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Tahoma, Arial, sans-serif; background:linear-gradient(135deg,#020617,#111827); color:var(--text); }
+    header { padding:24px; border-bottom:1px solid var(--line); position:sticky; top:0; background:rgba(15,23,42,.94); backdrop-filter: blur(10px); z-index:1; }
+    h1 { margin:0 0 8px; font-size:24px; } p { color:var(--muted); line-height:1.8; } main { max-width:1180px; margin:0 auto; padding:24px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(290px,1fr)); gap:16px; }
+    .card { background:rgba(17,24,39,.92); border:1px solid var(--line); border-radius:18px; padding:18px; box-shadow:0 12px 40px rgba(0,0,0,.22); }
+    label { display:block; margin:12px 0 6px; color:#cbd5e1; font-size:13px; }
+    input, textarea, select, button { width:100%; border-radius:12px; border:1px solid var(--line); padding:11px 12px; background:#020617; color:var(--text); font:inherit; }
+    textarea { min-height:110px; resize:vertical; } button { cursor:pointer; border:0; background:var(--accent); color:#022c22; font-weight:700; margin-top:12px; }
+    button.secondary { background:#38bdf8; color:#082f49; } button.danger { background:var(--danger); color:#fff; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; } .hidden { display:none; }
+    .pill { display:inline-block; padding:4px 9px; border:1px solid var(--line); border-radius:999px; color:#cbd5e1; font-size:12px; margin:4px 0 0 4px; }
+    pre { white-space:pre-wrap; direction:ltr; text-align:left; background:#020617; border:1px solid var(--line); border-radius:14px; padding:12px; max-height:300px; overflow:auto; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; } th,td { border-bottom:1px solid var(--line); padding:9px; text-align:right; font-size:13px; } th { color:#cbd5e1; }
+    .status-ok { color:#86efac; } .status-warn { color:#fde68a; } .ltr { direction:ltr; text-align:left; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>پنل ادمین روبی پنل</h1>
+  <p>مدیریت زمان‌بندی پست، پاسخ خودکار، فیلترها، گزارش‌ها و چند کانال بدون نیاز به کدنویسی.</p>
+</header>
+<main>
+  <section class="grid">
+    <div class="card" id="loginCard">
+      <h2>ورود ادمین</h2>
+      <label>شماره موبایل</label><input id="phone" placeholder="مثلاً 09123456789" />
+      <label>رمز عبور</label><input id="password" type="password" />
+      <button onclick="login()">ورود</button>
+      <p id="loginMsg"></p>
+    </div>
+    <div class="card hidden" id="contextCard">
+      <h2>انتخاب محیط</h2>
+      <button class="secondary" onclick="loadWorkspaces()">بارگذاری workspaceها</button>
+      <label>Workspace</label><select id="workspace" onchange="loadChannels()"></select>
+      <label>Channel</label><select id="channel"></select>
+      <button onclick="refreshAll()">نمایش داشبورد</button>
+      <button class="danger" onclick="logout()">خروج</button>
+    </div>
+  </section>
+
+  <section class="grid hidden" id="dashboard">
+    <div class="card">
+      <h2>وضعیت سریع</h2>
+      <div id="healthBox"></div>
+      <button class="secondary" onclick="loadReports()">به‌روزرسانی گزارش‌ها</button>
+    </div>
+    <div class="card">
+      <h2>گزارش ۷ روزه</h2>
+      <div id="summaryBox"></div>
+      <canvas id="chart" height="120"></canvas>
+    </div>
+  </section>
+
+  <section class="grid hidden" id="ops">
+    <div class="card">
+      <h2>پست زمان‌بندی‌شده</h2>
+      <label>متن پست</label><textarea id="postContent" placeholder="متن پست کانال..."></textarea>
+      <label>زمان ارسال</label><input id="scheduledAt" type="datetime-local" />
+      <button onclick="createScheduledPost()">ثبت زمان‌بندی</button>
+      <div id="scheduledList"></div>
+    </div>
+    <div class="card">
+      <h2>پاسخ خودکار</h2>
+      <label>کلمه کلیدی</label><input id="replyTrigger" placeholder="قیمت" />
+      <label>پاسخ</label><textarea id="replyText" placeholder="لیست قیمت..."></textarea>
+      <button onclick="createAutoReply()">ثبت پاسخ خودکار</button>
+      <div id="replyList"></div>
+    </div>
+    <div class="card">
+      <h2>فیلتر پیام‌ها</h2>
+      <label>عبارت/کلمه ممنوع</label><input id="filterPattern" placeholder="spam" />
+      <label>رفتار</label><select id="filterAction"><option value="warn">هشدار/ثبت</option><option value="delete">حذف/بلاک</option></select>
+      <label>دلیل</label><input id="filterReason" placeholder="اسپم یا توهین" />
+      <button onclick="createFilter()">ثبت فیلتر</button>
+      <div id="filterList"></div>
+    </div>
+  </section>
+
+  <section class="card hidden" id="rawCard">
+    <h2>خروجی عملیات</h2>
+    <pre id="raw"></pre>
+  </section>
+</main>
+<script>
+const API = '/api/v1';
+let token = localStorage.getItem('rb_admin_token') || '';
+const $ = id => document.getElementById(id);
+function authHeaders(){ return token ? {'Authorization':'Bearer '+token, 'Content-Type':'application/json'} : {'Content-Type':'application/json'}; }
+function showRaw(data){ $('rawCard').classList.remove('hidden'); $('raw').textContent = typeof data === 'string' ? data : JSON.stringify(data,null,2); }
+async function api(path, opts={}){ const res = await fetch(API+path, {...opts, headers:{...authHeaders(), ...(opts.headers||{})}}); const text = await res.text(); let data; try{data=text?JSON.parse(text):{}}catch{data=text} if(!res.ok) throw new Error(JSON.stringify(data)); return data; }
+function init(){ if(token){ $('loginCard').classList.add('hidden'); $('contextCard').classList.remove('hidden'); loadWorkspaces(); } }
+async function login(){ try{ const data=await api('/auth/login',{method:'POST',body:JSON.stringify({phone:$('phone').value.trim(),password:$('password').value})}); token=data.access_token; localStorage.setItem('rb_admin_token',token); $('loginMsg').textContent='ورود موفق'; init(); }catch(e){ $('loginMsg').textContent='ورود ناموفق: '+e.message; } }
+function logout(){ localStorage.removeItem('rb_admin_token'); location.reload(); }
+async function loadWorkspaces(){ const items=await api('/workspaces'); $('workspace').innerHTML=items.map(w=>`<option value="${w.id}">${w.name || ('Workspace '+w.id)}</option>`).join(''); await loadChannels(); }
+async function loadChannels(){ const ws=$('workspace').value; if(!ws) return; const items=await api(`/workspaces/${ws}/channels`); $('channel').innerHTML=items.map(c=>`<option value="${c.id}">${c.name} — ${c.rubika_channel_id}</option>`).join(''); }
+async function refreshAll(){ $('dashboard').classList.remove('hidden'); $('ops').classList.remove('hidden'); await Promise.all([loadHealth(), loadReports(), loadScheduled(), loadReplies(), loadFilters()]); }
+async function loadHealth(){ const [h,r]=await Promise.all([fetch(API+'/health').then(r=>r.json()), fetch(API+'/ready').then(r=>r.json())]); $('healthBox').innerHTML=`<p>Health: <b class="status-ok">${h.status}</b></p><p>Ready: <b class="status-ok">${r.status}</b></p><p>DB: ${r.services?.database} / Redis: ${r.services?.redis}</p>`; }
+async function loadReports(){ const ws=$('workspace').value, ch=$('channel').value; const [sum,daily]=await Promise.all([api(`/workspaces/${ws}/channels/${ch}/reports/summary`), api(`/workspaces/${ws}/reports/daily?days=7`)]); const s=sum.summary; $('summaryBox').innerHTML=`<span class="pill">ارسال موفق: ${s.sent_posts}</span><span class="pill">ارسال ناموفق: ${s.failed_posts}</span><span class="pill">پاسخ خودکار: ${s.auto_replies_sent}</span><span class="pill">حذف/فیلتر: ${s.deleted_messages}</span><span class="pill">خطا: ${s.webhook_processing_errors}</span>`; drawChart(daily.items||[]); }
+function drawChart(items){ const c=$('chart'), ctx=c.getContext('2d'), w=c.width=c.clientWidth*devicePixelRatio, h=c.height=140*devicePixelRatio; ctx.clearRect(0,0,w,h); const max=Math.max(1,...items.map(i=>i.auto_replies_sent+i.sent_posts+i.deleted_messages)); items.forEach((it,idx)=>{ const x=(idx+.5)*w/items.length, bar=(it.auto_replies_sent+it.sent_posts+it.deleted_messages)/max*(h-30); ctx.fillStyle='#22c55e'; ctx.fillRect(x-12*devicePixelRatio,h-bar-20*devicePixelRatio,24*devicePixelRatio,bar); ctx.fillStyle='#94a3b8'; ctx.font=`${10*devicePixelRatio}px sans-serif`; ctx.fillText(String(it.date).slice(5),x-18*devicePixelRatio,h-5*devicePixelRatio); }); }
+async function createScheduledPost(){ const ws=$('workspace').value,ch=$('channel').value; const local=$('scheduledAt').value; const scheduled_at = local ? new Date(local).toISOString() : ''; const data=await api(`/workspaces/${ws}/channels/${ch}/scheduled-posts`,{method:'POST',body:JSON.stringify({content:$('postContent').value, scheduled_at})}); showRaw(data); await loadScheduled(); }
+async function loadScheduled(){ const ws=$('workspace').value,ch=$('channel').value; const data=await api(`/workspaces/${ws}/channels/${ch}/scheduled-posts?page=1&limit=10`); $('scheduledList').innerHTML=table(['id','status','scheduled_at','content'], data.items); }
+async function createAutoReply(){ const ws=$('workspace').value,ch=$('channel').value; const data=await api(`/workspaces/${ws}/channels/${ch}/auto-replies`,{method:'POST',body:JSON.stringify({trigger_text:$('replyTrigger').value, match_type:'contains', reply_text:$('replyText').value, is_active:true})}); showRaw(data); await loadReplies(); }
+async function loadReplies(){ const ws=$('workspace').value,ch=$('channel').value; const data=await api(`/workspaces/${ws}/channels/${ch}/auto-replies?page=1&limit=10`); $('replyList').innerHTML=table(['id','is_active','trigger_text','reply_text'], data.items); }
+async function createFilter(){ const ws=$('workspace').value,ch=$('channel').value; const data=await api(`/workspaces/${ws}/channels/${ch}/filters`,{method:'POST',body:JSON.stringify({pattern:$('filterPattern').value, match_type:'contains', action:$('filterAction').value, reason:$('filterReason').value || null, is_active:true})}); showRaw(data); await loadFilters(); }
+async function loadFilters(){ const ws=$('workspace').value,ch=$('channel').value; const data=await api(`/workspaces/${ws}/channels/${ch}/filters?page=1&limit=10`); $('filterList').innerHTML=table(['id','is_active','pattern','action'], data.items); }
+function table(cols, items=[]){ if(!items.length) return '<p>موردی ثبت نشده است.</p>'; return `<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${items.map(row=>`<tr>${cols.map(c=>`<td>${String(row[c] ?? '').slice(0,80)}</td>`).join('')}</tr>`).join('')}</tbody></table>`; }
+init();
+</script>
+</body>
+</html>

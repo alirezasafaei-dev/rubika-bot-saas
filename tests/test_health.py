@@ -65,3 +65,15 @@ async def test_root() -> None:
         response = await client.get("/")
     assert response.status_code == 200
     assert "message" in response.json()
+
+
+@pytest.mark.asyncio
+async def test_admin_panel() -> None:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.get("/admin")
+
+    assert response.status_code == 200
+    assert "پنل ادمین روبی پنل" in response.text
+    assert "پست زمان‌بندی‌شده" in response.text

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import text
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -22,6 +23,8 @@ from app.db.session import engine
 from app.schemas.webhook import RubikaWebhookAdapterPayload, RubikaWebhookResponse
 from app.services.webhook_service import WebhookService
 from app.workers.queue import redis_ping
+
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 setup_logging()
 
@@ -157,6 +160,11 @@ async def readiness_check() -> JSONResponse:
             "services": services,
         },
     )
+
+
+@app.get("/admin", response_class=FileResponse)
+async def admin_panel() -> FileResponse:
+    return FileResponse(STATIC_DIR / "admin.html")
 
 
 @app.get("/")
