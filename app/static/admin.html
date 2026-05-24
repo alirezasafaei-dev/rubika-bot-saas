@@ -16,11 +16,21 @@
     input, textarea, select, button { width:100%; border-radius:12px; border:1px solid var(--line); padding:11px 12px; background:#020617; color:var(--text); font:inherit; }
     textarea { min-height:110px; resize:vertical; } button { cursor:pointer; border:0; background:var(--accent); color:#022c22; font-weight:700; margin-top:12px; }
     button.secondary { background:#38bdf8; color:#082f49; } button.danger { background:var(--danger); color:#fff; }
+    button.small { padding:6px 10px; margin:2px; font-size:12px; width:auto; display:inline-block; }
     .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; } .hidden { display:none; }
     .pill { display:inline-block; padding:4px 9px; border:1px solid var(--line); border-radius:999px; color:#cbd5e1; font-size:12px; margin:4px 0 0 4px; }
     pre { white-space:pre-wrap; direction:ltr; text-align:left; background:#020617; border:1px solid var(--line); border-radius:14px; padding:12px; max-height:300px; overflow:auto; }
     table { width:100%; border-collapse:collapse; margin-top:10px; } th,td { border-bottom:1px solid var(--line); padding:9px; text-align:right; font-size:13px; } th { color:#cbd5e1; }
     .status-ok { color:#86efac; } .status-warn { color:#fde68a; } .ltr { direction:ltr; text-align:left; }
+    .msg { padding:10px; border-radius:8px; margin:10px 0; font-size:13px; }
+    .msg.success { background:#022c22; border:1px solid #22c55e; color:#86efac; }
+    .msg.error { background:#450a0a; border:1px solid #ef4444; color:#fca5a5; }
+    .toggle { position:relative; display:inline-block; width:44px; height:24px; vertical-align:middle; }
+    .toggle input { opacity:0; width:0; height:0; }
+    .toggle .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#334155; border-radius:24px; transition:.3s; }
+    .toggle input:checked + .slider { background:#22c55e; }
+    .toggle .slider:before { position:absolute; content:""; height:18px; width:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.3s; }
+    .toggle input:checked + .slider:before { transform:translateX(20px); }
   </style>
 </head>
 <body>
@@ -46,6 +56,8 @@
       <button class="danger" onclick="logout()">خروج</button>
     </div>
   </section>
+
+  <div id="msgBox"></div>
 
   <section class="grid hidden" id="dashboard">
     <div class="card">
@@ -96,23 +108,203 @@ let token = localStorage.getItem('rb_admin_token') || '';
 const $ = id => document.getElementById(id);
 function authHeaders(){ return token ? {'Authorization':'Bearer '+token, 'Content-Type':'application/json'} : {'Content-Type':'application/json'}; }
 function showRaw(data){ $('rawCard').classList.remove('hidden'); $('raw').textContent = typeof data === 'string' ? data : JSON.stringify(data,null,2); }
-async function api(path, opts={}){ const res = await fetch(API+path, {...opts, headers:{...authHeaders(), ...(opts.headers||{})}}); const text = await res.text(); let data; try{data=text?JSON.parse(text):{}}catch{data=text} if(!res.ok) throw new Error(JSON.stringify(data)); return data; }
+async function api(path, opts={}){ 
+  const res = await fetch(API+path, {...opts, headers:{...authHeaders(), ...(opts.headers||{})}}); 
+  const text = await res.text(); 
+  let data; 
+  try{data=text?JSON.parse(text):{}}catch{data=text} 
+  if(!res.ok) throw new Error(JSON.stringify(data)); 
+  return data; 
+}
+function showMsg(text, type='success'){ 
+  const box = $('msgBox'); 
+  box.innerHTML = `<div class="msg ${type}">${text}</div>`; 
+  setTimeout(() => box.innerHTML = '', 5000); 
+}
 function init(){ if(token){ $('loginCard').classList.add('hidden'); $('contextCard').classList.remove('hidden'); loadWorkspaces(); } }
-async function login(){ try{ const data=await api('/auth/login',{method:'POST',body:JSON.stringify({phone:$('phone').value.trim(),password:$('password').value})}); token=data.access_token; localStorage.setItem('rb_admin_token',token); $('loginMsg').textContent='ورود موفق'; init(); }catch(e){ $('loginMsg').textContent='ورود ناموفق: '+e.message; } }
+async function login(){ 
+  try{ 
+    const data=await api('/auth/login',{method:'POST',body:JSON.stringify({phone:$('phone').value.trim(),password:$('password').value})}); 
+    token=data.access_token; 
+    localStorage.setItem('rb_admin_token',token); 
+    $('loginMsg').textContent='ورود موفق'; 
+    init(); 
+  }catch(e){ 
+    $('loginMsg').textContent='ورود ناموفق: '+e.message; 
+  } 
+}
 function logout(){ localStorage.removeItem('rb_admin_token'); location.reload(); }
-async function loadWorkspaces(){ const items=await api('/workspaces'); $('workspace').innerHTML=items.map(w=>`<option value="${w.id}">${w.name || ('Workspace '+w.id)}</option>`).join(''); await loadChannels(); }
-async function loadChannels(){ const ws=$('workspace').value; if(!ws) return; const items=await api(`/workspaces/${ws}/channels`); $('channel').innerHTML=items.map(c=>`<option value="${c.id}">${c.name} — ${c.rubika_channel_id}</option>`).join(''); }
+async function loadWorkspaces(){ 
+  const items=await api('/workspaces'); 
+  $('workspace').innerHTML=items.map(w=>`<option value="${w.id}">${w.name || ('Workspace '+w.id)}</option>`).join(''); 
+  await loadChannels(); 
+}
+async function loadChannels(){ 
+  const ws=$('workspace').value; 
+  if(!ws) return; 
+  const items=await api(`/workspaces/${ws}/channels`); 
+  $('channel').innerHTML=items.map(c=>`<option value="${c.id}">${c.name} — ${c.rubika_channel_id}</option>`).join(''); 
+}
 async function refreshAll(){ $('dashboard').classList.remove('hidden'); $('ops').classList.remove('hidden'); await Promise.all([loadHealth(), loadReports(), loadScheduled(), loadReplies(), loadFilters()]); }
-async function loadHealth(){ const [h,r]=await Promise.all([fetch(API+'/health').then(r=>r.json()), fetch(API+'/ready').then(r=>r.json())]); $('healthBox').innerHTML=`<p>Health: <b class="status-ok">${h.status}</b></p><p>Ready: <b class="status-ok">${r.status}</b></p><p>DB: ${r.services?.database} / Redis: ${r.services?.redis}</p>`; }
-async function loadReports(){ const ws=$('workspace').value, ch=$('channel').value; const [sum,daily]=await Promise.all([api(`/workspaces/${ws}/channels/${ch}/reports/summary`), api(`/workspaces/${ws}/reports/daily?days=7`)]); const s=sum.summary; $('summaryBox').innerHTML=`<span class="pill">ارسال موفق: ${s.sent_posts}</span><span class="pill">ارسال ناموفق: ${s.failed_posts}</span><span class="pill">پاسخ خودکار: ${s.auto_replies_sent}</span><span class="pill">حذف/فیلتر: ${s.deleted_messages}</span><span class="pill">خطا: ${s.webhook_processing_errors}</span>`; drawChart(daily.items||[]); }
-function drawChart(items){ const c=$('chart'), ctx=c.getContext('2d'), w=c.width=c.clientWidth*devicePixelRatio, h=c.height=140*devicePixelRatio; ctx.clearRect(0,0,w,h); const max=Math.max(1,...items.map(i=>i.auto_replies_sent+i.sent_posts+i.deleted_messages)); items.forEach((it,idx)=>{ const x=(idx+.5)*w/items.length, bar=(it.auto_replies_sent+it.sent_posts+it.deleted_messages)/max*(h-30); ctx.fillStyle='#22c55e'; ctx.fillRect(x-12*devicePixelRatio,h-bar-20*devicePixelRatio,24*devicePixelRatio,bar); ctx.fillStyle='#94a3b8'; ctx.font=`${10*devicePixelRatio}px sans-serif`; ctx.fillText(String(it.date).slice(5),x-18*devicePixelRatio,h-5*devicePixelRatio); }); }
-async function createScheduledPost(){ const ws=$('workspace').value,ch=$('channel').value; const local=$('scheduledAt').value; const scheduled_at = local ? new Date(local).toISOString() : ''; const data=await api(`/workspaces/${ws}/channels/${ch}/scheduled-posts`,{method:'POST',body:JSON.stringify({content:$('postContent').value, scheduled_at})}); showRaw(data); await loadScheduled(); }
-async function loadScheduled(){ const ws=$('workspace').value,ch=$('channel').value; const data=await api(`/workspaces/${ws}/channels/${ch}/scheduled-posts?page=1&limit=10`); $('scheduledList').innerHTML=table(['id','status','scheduled_at','content'], data.items); }
-async function createAutoReply(){ const ws=$('workspace').value,ch=$('channel').value; const data=await api(`/workspaces/${ws}/channels/${ch}/auto-replies`,{method:'POST',body:JSON.stringify({trigger_text:$('replyTrigger').value, match_type:'contains', reply_text:$('replyText').value, is_active:true})}); showRaw(data); await loadReplies(); }
-async function loadReplies(){ const ws=$('workspace').value,ch=$('channel').value; const data=await api(`/workspaces/${ws}/channels/${ch}/auto-replies?page=1&limit=10`); $('replyList').innerHTML=table(['id','is_active','trigger_text','reply_text'], data.items); }
-async function createFilter(){ const ws=$('workspace').value,ch=$('channel').value; const data=await api(`/workspaces/${ws}/channels/${ch}/filters`,{method:'POST',body:JSON.stringify({pattern:$('filterPattern').value, match_type:'contains', action:$('filterAction').value, reason:$('filterReason').value || null, is_active:true})}); showRaw(data); await loadFilters(); }
-async function loadFilters(){ const ws=$('workspace').value,ch=$('channel').value; const data=await api(`/workspaces/${ws}/channels/${ch}/filters?page=1&limit=10`); $('filterList').innerHTML=table(['id','is_active','pattern','action'], data.items); }
-function table(cols, items=[]){ if(!items.length) return '<p>موردی ثبت نشده است.</p>'; return `<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${items.map(row=>`<tr>${cols.map(c=>`<td>${String(row[c] ?? '').slice(0,80)}</td>`).join('')}</tr>`).join('')}</tbody></table>`; }
+async function loadHealth(){ 
+  const [h,r]=await Promise.all([fetch(API+'/health').then(r=>r.json()), fetch(API+'/ready').then(r=>r.json())]); 
+  $('healthBox').innerHTML=`<p>Health: <b class="status-ok">${h.status}</b></p><p>Ready: <b class="status-ok">${r.status}</b></p><p>DB: ${r.services?.database} / Redis: ${r.services?.redis}</p>`; 
+}
+async function loadReports(){ 
+  const ws=$('workspace').value, ch=$('channel').value; 
+  const [sum,daily]=await Promise.all([api(`/workspaces/${ws}/channels/${ch}/reports/summary`), api(`/workspaces/${ws}/reports/daily?days=7`)]); 
+  const s=sum.summary; 
+  $('summaryBox').innerHTML=`<span class="pill">ارسال موفق: ${s.sent_posts}</span><span class="pill">ارسال ناموفق: ${s.failed_posts}</span><span class="pill">پاسخ خودکار: ${s.auto_replies_sent}</span><span class="pill">حذف/فیلتر: ${s.deleted_messages}</span><span class="pill">خطا: ${s.webhook_processing_errors}</span>`; 
+  drawChart(daily.items||[]); 
+}
+function drawChart(items){ 
+  const c=$('chart'), ctx=c.getContext('2d'), w=c.width=c.clientWidth*devicePixelRatio, h=c.height=140*devicePixelRatio; 
+  ctx.clearRect(0,0,w,h); 
+  const max=Math.max(1,...items.map(i=>i.auto_replies_sent+i.sent_posts+i.deleted_messages)); 
+  items.forEach((it,idx)=>{ 
+    const x=(idx+.5)*w/items.length, bar=(it.auto_replies_sent+it.sent_posts+it.deleted_messages)/max*(h-30); 
+    ctx.fillStyle='#22c55e'; 
+    ctx.fillRect(x-12*devicePixelRatio,h-bar-20*devicePixelRatio,24*devicePixelRatio,bar); 
+    ctx.fillStyle='#94a3b8'; 
+    ctx.font=`${10*devicePixelRatio}px sans-serif`; 
+    ctx.fillText(String(it.date).slice(5),x-18*devicePixelRatio,h-5*devicePixelRatio); 
+  }); 
+}
+
+// Scheduled Posts
+async function createScheduledPost(){ 
+  try{
+    const ws=$('workspace').value,ch=$('channel').value; 
+    const local=$('scheduledAt').value; 
+    const scheduled_at = local ? new Date(local).toISOString() : ''; 
+    const data=await api(`/workspaces/${ws}/channels/${ch}/scheduled-posts`,{method:'POST',body:JSON.stringify({content:$('postContent').value, scheduled_at})}); 
+    showMsg('پست زمان‌بندی شده ثبت شد'); 
+    $('postContent').value=''; $('scheduledAt').value='';
+    await loadScheduled(); 
+  }catch(e){ showMsg('خطا: '+e.message, 'error'); }
+}
+async function loadScheduled(){ 
+  const ws=$('workspace').value,ch=$('channel').value; 
+  const data=await api(`/workspaces/${ws}/channels/${ch}/scheduled-posts?page=1&limit=20`); 
+  $('scheduledList').innerHTML=tableWithActions('scheduled', data.items); 
+}
+async function deleteScheduledPost(id){ 
+  if(!confirm('حذف این پست؟')) return;
+  try{
+    const ws=$('workspace').value,ch=$('channel').value; 
+    await api(`/workspaces/${ws}/channels/${ch}/scheduled-posts/${id}`,{method:'DELETE'}); 
+    showMsg('پست حذف شد'); 
+    await loadScheduled(); 
+  }catch(e){ showMsg('خطا: '+e.message, 'error'); }
+}
+async function cancelScheduledPost(id){ 
+  try{
+    const ws=$('workspace').value,ch=$('channel').value; 
+    await api(`/workspaces/${ws}/channels/${ch}/scheduled-posts/${id}`,{method:'PATCH',body:JSON.stringify({status:'cancelled'})}); 
+    showMsg('پست لغو شد'); 
+    await loadScheduled(); 
+  }catch(e){ showMsg('خطا: '+e.message, 'error'); }
+}
+
+// Auto Replies
+async function createAutoReply(){ 
+  try{
+    const ws=$('workspace').value,ch=$('channel').value; 
+    const data=await api(`/workspaces/${ws}/channels/${ch}/auto-replies`,{method:'POST',body:JSON.stringify({trigger_text:$('replyTrigger').value, match_type:'contains', reply_text:$('replyText').value, is_active:true})}); 
+    showMsg('پاسخ خودکار ثبت شد'); 
+    $('replyTrigger').value=''; $('replyText').value='';
+    await loadReplies(); 
+  }catch(e){ showMsg('خطا: '+e.message, 'error'); }
+}
+async function loadReplies(){ 
+  const ws=$('workspace').value,ch=$('channel').value; 
+  const data=await api(`/workspaces/${ws}/channels/${ch}/auto-replies?page=1&limit=20`); 
+  $('replyList').innerHTML=tableWithActions('reply', data.items); 
+}
+async function toggleAutoReply(id, currentState){ 
+  try{
+    const ws=$('workspace').value,ch=$('channel').value; 
+    await api(`/workspaces/${ws}/channels/${ch}/auto-replies/${id}`,{method:'PATCH',body:JSON.stringify({is_active:!currentState})}); 
+    showMsg('وضعیت تغییر کرد'); 
+    await loadReplies(); 
+  }catch(e){ showMsg('خطا: '+e.message, 'error'); }
+}
+async function deleteAutoReply(id){ 
+  if(!confirm('حذف این پاسخ خودکار؟')) return;
+  try{
+    const ws=$('workspace').value,ch=$('channel').value; 
+    await api(`/workspaces/${ws}/channels/${ch}/auto-replies/${id}`,{method:'DELETE'}); 
+    showMsg('پاسخ خودکار حذف شد'); 
+    await loadReplies(); 
+  }catch(e){ showMsg('خطا: '+e.message, 'error'); }
+}
+
+// Filters
+async function createFilter(){ 
+  try{
+    const ws=$('workspace').value,ch=$('channel').value; 
+    const data=await api(`/workspaces/${ws}/channels/${ch}/filters`,{method:'POST',body:JSON.stringify({pattern:$('filterPattern').value, match_type:'contains', action:$('filterAction').value, reason:$('filterReason').value || null, is_active:true})}); 
+    showMsg('فیلتر ثبت شد'); 
+    $('filterPattern').value=''; $('filterReason').value='';
+    await loadFilters(); 
+  }catch(e){ showMsg('خطا: '+e.message, 'error'); }
+}
+async function loadFilters(){ 
+  const ws=$('workspace').value,ch=$('channel').value; 
+  const data=await api(`/workspaces/${ws}/channels/${ch}/filters?page=1&limit=20`); 
+  $('filterList').innerHTML=tableWithActions('filter', data.items); 
+}
+async function toggleFilter(id, currentState){ 
+  try{
+    const ws=$('workspace').value,ch=$('channel').value; 
+    await api(`/workspaces/${ws}/channels/${ch}/filters/${id}`,{method:'PATCH',body:JSON.stringify({is_active:!currentState})}); 
+    showMsg('وضعیت فیلتر تغییر کرد'); 
+    await loadFilters(); 
+  }catch(e){ showMsg('خطا: '+e.message, 'error'); }
+}
+async function deleteFilter(id){ 
+  if(!confirm('حذف این فیلتر؟')) return;
+  try{
+    const ws=$('workspace').value,ch=$('channel').value; 
+    await api(`/workspaces/${ws}/channels/${ch}/filters/${id}`,{method:'DELETE'}); 
+    showMsg('فیلتر حذف شد'); 
+    await loadFilters(); 
+  }catch(e){ showMsg('خطا: '+e.message, 'error'); }
+}
+
+function tableWithActions(type, items=[]){ 
+  if(!items.length) return '<p>موردی ثبت نشده است.</p>'; 
+  let html = '<table><thead><tr>';
+  if(type==='scheduled'){ 
+    html += '<th>ID</th><th>وضعیت</th><th>زمان</th><th>محتوا</th><th>عملیات</th>'; 
+  } else if(type==='reply'){ 
+    html += '<th>ID</th><th>فعال</th><th>کلید</th><th>پاسخ</th><th>عملیات</th>'; 
+  } else if(type==='filter'){ 
+    html += '<th>ID</th><th>فعال</th><th>الگو</th><th>رفتار</th><th>عملیات</th>'; 
+  }
+  html += '</tr></thead><tbody>';
+  items.forEach(row => {
+    html += '<tr>';
+    if(type==='scheduled'){
+      html += `<td>${row.id}</td><td>${row.status}</td><td class="ltr">${String(row.scheduled_at||'').slice(0,16)}</td><td>${String(row.content||'').slice(0,50)}</td>`;
+      html += `<td><button class="small danger" onclick="deleteScheduledPost(${row.id})">حذف</button>`;
+      if(row.status==='pending') html += `<button class="small secondary" onclick="cancelScheduledPost(${row.id})">لغو</button>`;
+      html += `</td>`;
+    } else if(type==='reply'){
+      const active = row.is_active;
+      html += `<td>${row.id}</td><td><label class="toggle"><input type="checkbox" ${active?'checked':''} onchange="toggleAutoReply(${row.id},${active})"><span class="slider"></span></label></td><td>${String(row.trigger_text||'').slice(0,30)}</td><td>${String(row.reply_text||'').slice(0,50)}</td>`;
+      html += `<td><button class="small danger" onclick="deleteAutoReply(${row.id})">حذف</button></td>`;
+    } else if(type==='filter'){
+      const active = row.is_active;
+      html += `<td>${row.id}</td><td><label class="toggle"><input type="checkbox" ${active?'checked':''} onchange="toggleFilter(${row.id},${active})"><span class="slider"></span></label></td><td>${String(row.pattern||'').slice(0,30)}</td><td>${row.action}</td>`;
+      html += `<td><button class="small danger" onclick="deleteFilter(${row.id})">حذف</button></td>`;
+    }
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
 init();
 </script>
 </body>
