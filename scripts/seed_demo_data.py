@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy import select
-from app.core.database import async_session_maker
+from app.db.session import AsyncSessionLocal
 from app.models.user import User
 from app.models.workspace import Workspace
 from app.models.channel import Channel
@@ -23,7 +23,7 @@ from app.models.scheduled_post import ScheduledPost
 
 async def seed_demo():
     """Seed safe demo data for commercial presentation."""
-    async with async_session_maker() as session:
+    async with AsyncSessionLocal() as session:
         # Find first user (owner)
         result = await session.execute(select(User).limit(1))
         user = result.scalar_one_or_none()
