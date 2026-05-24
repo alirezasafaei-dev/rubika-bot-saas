@@ -4,14 +4,13 @@ import pytest
 from sqlalchemy import select
 
 from app.core.config import settings
+from app.integrations.rubika_sender import SendResult
 from app.models.auto_reply import AutoReply
 from app.models.filter import Filter, FilterAction
 from app.models.webhook_processing import (
     MessageProcessingLog,
     ProcessingOutcome,
-    WebhookEvent,
 )
-from app.integrations.rubika_sender import SendResult
 
 pytestmark = pytest.mark.asyncio
 
@@ -92,7 +91,7 @@ async def test_webhook_accepts_rubika_update_format(
 
     assert response.status_code == 200
     assert response.json()["accepted"] is True
-    assert response.json()["reason"] == "message_processed"
+    assert response.json()["reason"] == "menu_reply"
 
 
 async def test_webhook_start_menu_sends_real_keypads(
@@ -252,6 +251,9 @@ async def test_webhook_plain_text_menu_button_routes_without_button_id(
     [
         ("کمک", "راهنما"),
         ("پشتیبانی", "تماس و پشتیبانی"),
+        ("/support", "تماس و پشتیبانی"),
+        ("/channels", "کانال‌های متصل"),
+        ("کانال‌ها", "کانال‌های متصل"),
         ("status", "وضعیت سرویس"),
         ("سلام", "برای شروع"),
         ("ممنون", "خواهش می‌کنم"),

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
 import json
 import re
+from contextlib import suppress
+from datetime import UTC, datetime
 from textwrap import dedent
 
 from app.core.config import settings
@@ -24,6 +25,7 @@ class WebhookService:
     MENU_HELP = "menu_help"
     MENU_STATUS = "menu_status"
     MENU_CONTACT = "menu_contact"
+    MENU_CHANNELS = "menu_channels"
     MENU_BACK = "menu_back"
     MENU_START = "menu_start"
     MENU_TEXT_HELP = "راهنما"
@@ -67,7 +69,13 @@ class WebhookService:
             "ارتباط با پشتیبانی": cls.MENU_CONTACT,
             "تماس با پشتیبانی": cls.MENU_CONTACT,
             "تماس با پشتيبانی": cls.MENU_CONTACT,
+            "/support": cls.MENU_CONTACT,
             "support": cls.MENU_CONTACT,
+            "/channels": cls.MENU_CHANNELS,
+            "channels": cls.MENU_CHANNELS,
+            "کانال‌ها": cls.MENU_CHANNELS,
+            "کانال ها": cls.MENU_CHANNELS,
+            "کانال": cls.MENU_CHANNELS,
             "منوی اصلی": cls.MENU_START,
             "منو اصلی": cls.MENU_START,
             "منوی اصلي": cls.MENU_START,
@@ -167,7 +175,9 @@ class WebhookService:
                 decoded = []
             if isinstance(decoded, list):
                 items.extend(
-                    item.strip() for item in decoded if isinstance(item, str) and item.strip()
+                    item.strip()
+                    for item in decoded
+                    if isinstance(item, str) and item.strip()
                 )
         return items
 
@@ -224,19 +234,41 @@ class WebhookService:
             • راهنما: نحوه استفاده
             • وضعیت: وضعیت سرویس
             • تماس: مسیر ارتباط با پشتیبانی
+            • کانال‌ها: کانال‌های متصل به همین workspace
             """
         ).strip()
         chat_keypad = {
             "rows": [
                 {
                     "buttons": [
-                        {"id": cls.MENU_HELP, "type": "Simple", "button_text": "راهنما"},
-                        {"id": cls.MENU_STATUS, "type": "Simple", "button_text": "وضعیت"},
+                        {
+                            "id": cls.MENU_HELP,
+                            "type": "Simple",
+                            "button_text": "راهنما",
+                        },
+                        {
+                            "id": cls.MENU_STATUS,
+                            "type": "Simple",
+                            "button_text": "وضعیت",
+                        },
                     ]
                 },
                 {
                     "buttons": [
-                        {"id": cls.MENU_CONTACT, "type": "Simple", "button_text": "تماس"}
+                        {
+                            "id": cls.MENU_CONTACT,
+                            "type": "Simple",
+                            "button_text": "تماس",
+                        }
+                    ]
+                },
+                {
+                    "buttons": [
+                        {
+                            "id": cls.MENU_CHANNELS,
+                            "type": "Simple",
+                            "button_text": "کانال‌ها",
+                        }
                     ]
                 },
             ],
@@ -247,14 +279,35 @@ class WebhookService:
             "rows": [
                 {
                     "buttons": [
-                        {"id": cls.MENU_HELP, "type": "Simple", "button_text": "راهنما"},
-                        {"id": cls.MENU_STATUS, "type": "Simple", "button_text": "وضعیت"},
+                        {
+                            "id": cls.MENU_HELP,
+                            "type": "Simple",
+                            "button_text": "راهنما",
+                        },
+                        {
+                            "id": cls.MENU_STATUS,
+                            "type": "Simple",
+                            "button_text": "وضعیت",
+                        },
                     ]
                 },
                 {
                     "buttons": [
-                        {"id": cls.MENU_CONTACT, "type": "Simple", "button_text": "تماس"},
-                        {"id": cls.MENU_START, "type": "Simple", "button_text": "منوی اصلی"},
+                        {
+                            "id": cls.MENU_CONTACT,
+                            "type": "Simple",
+                            "button_text": "تماس",
+                        },
+                        {
+                            "id": cls.MENU_CHANNELS,
+                            "type": "Simple",
+                            "button_text": "کانال‌ها",
+                        },
+                        {
+                            "id": cls.MENU_START,
+                            "type": "Simple",
+                            "button_text": "منوی اصلی",
+                        },
                     ]
                 },
             ]
@@ -286,6 +339,8 @@ class WebhookService:
                     • /start منوی اصلی را باز می‌کند.
                     • با دکمه‌های پایین می‌توانی سریع‌تر بین گزینه‌ها جابه‌جا شوی.
                     • اگر برای پیام شما پاسخ خودکار تعریف شده باشد، همان پاسخ ارسال می‌شود.
+                    • /channels کانال‌های متصل را نشان می‌دهد.
+                    • /support مسیر تماس و پشتیبانی را نشان می‌دهد.
                     • اگر پیام نامشخص باشد، دوباره شما را به مسیر درست هدایت می‌کنم.
                     """
                 ).strip(),
@@ -325,7 +380,9 @@ class WebhookService:
         if action == self.MENU_CONTACT:
             contact = (settings.rubika_support_contact or "").strip()
             contact_line = (
-                f"• مسیر تماس: {contact}" if contact else "• مسیر تماس هنوز در تنظیمات ثبت نشده است."
+                f"• مسیر تماس: {contact}"
+                if contact
+                else "• مسیر تماس هنوز در تنظیمات ثبت نشده است."
             )
             return (
                 dedent(
@@ -333,6 +390,22 @@ class WebhookService:
                     تماس و پشتیبانی:
                     {contact_line}
                     • برای برگشت به منوی اصلی، دکمه «بازگشت» را بزن.
+                    """
+                ).strip(),
+                None,
+                self._inline_back_keypad(),
+                None,
+            )
+        if action == self.MENU_CHANNELS:
+            channel = await self._require_channel(channel_id)
+            return (
+                dedent(
+                    f"""
+                    کانال‌های متصل:
+                    • کانال فعلی: {channel.name}
+                    • شناسه داخلی کانال: {channel.id}
+                    • workspace: {channel.workspace_id}
+                    برای وضعیت عملیاتی همین کانال، گزینه «وضعیت» را بزن.
                     """
                 ).strip(),
                 None,
@@ -485,7 +558,9 @@ class WebhookService:
             await self.db.commit()
             return {
                 "accepted": True,
-                "reason": "flagged" if matched_filter.action == FilterAction.FLAG else "warning",
+                "reason": "flagged"
+                if matched_filter.action == FilterAction.FLAG
+                else "warning",
             }
 
         auto_replies = await self.auto_reply_repo.list_active_by_channel(
@@ -501,7 +576,9 @@ class WebhookService:
             try:
                 await self._send_bot_reply(
                     channel_id=channel_id,
-                    rubika_channel_id=(await self._require_channel(channel_id)).rubika_channel_id,
+                    rubika_channel_id=(
+                        await self._require_channel(channel_id)
+                    ).rubika_channel_id,
                     text=reply_text,
                     chat_keypad=chat_keypad,
                     inline_keypad=inline_keypad,
@@ -533,7 +610,9 @@ class WebhookService:
                 try:
                     await self._send_auto_reply_flow(
                         channel_id=channel_id,
-                        rubika_channel_id=(await self._require_channel(channel_id)).rubika_channel_id,
+                        rubika_channel_id=(
+                            await self._require_channel(channel_id)
+                        ).rubika_channel_id,
                         reply=reply,
                     )
                 except RuntimeError as exc:
@@ -569,15 +648,15 @@ class WebhookService:
         )
         if normalized_message:
             reply_text, inline_keypad = self._build_no_match_reply()
-            try:
+            with suppress(RuntimeError):
                 await self._send_bot_reply(
                     channel_id=channel_id,
-                    rubika_channel_id=(await self._require_channel(channel_id)).rubika_channel_id,
+                    rubika_channel_id=(
+                        await self._require_channel(channel_id)
+                    ).rubika_channel_id,
                     text=reply_text,
                     inline_keypad=inline_keypad,
                 )
-            except RuntimeError:
-                pass
         await self.db.commit()
         return {"accepted": True, "reason": "message_processed"}
 
