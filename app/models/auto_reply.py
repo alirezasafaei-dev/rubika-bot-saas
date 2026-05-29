@@ -54,7 +54,7 @@ class AutoReply(Base):
     )
 
     # Relationships
-    channel: Mapped["Channel"] = relationship("Channel", back_populates="auto_replies")
+    channel: Mapped[Channel] = relationship("Channel", back_populates="auto_replies")
     next_step: Mapped[AutoReply | None] = relationship(
         "AutoReply",
         remote_side="AutoReply.id",

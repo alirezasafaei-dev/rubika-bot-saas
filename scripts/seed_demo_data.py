@@ -6,19 +6,18 @@ Safe to run multiple times - checks for existing data.
 import asyncio
 import sys
 from pathlib import Path
-from datetime import datetime, timedelta
 
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy import select
+
 from app.db.session import AsyncSessionLocal
+from app.models.auto_reply import AutoReply
+from app.models.channel import Channel
+from app.models.filter import Filter
 from app.models.user import User
 from app.models.workspace import Workspace
-from app.models.channel import Channel
-from app.models.auto_reply import AutoReply
-from app.models.filter import Filter
-from app.models.scheduled_post import ScheduledPost
 
 
 async def seed_demo():

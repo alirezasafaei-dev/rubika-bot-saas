@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+
 from app.core.config import settings
 from app.models.auto_reply import AutoReply
 
